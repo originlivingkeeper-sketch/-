@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   define: {
+    // Guidelines require using process.env.API_KEY. Mapping it here for client access.
     'process.env.API_KEY': JSON.stringify(process.env.API_KEY)
   },
   server: {

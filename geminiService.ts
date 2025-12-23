@@ -2,14 +2,27 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AssessmentData } from "./types";
 
+/**
+ * Recommended models for text tasks according to guidelines:
+ * - Complex Text Tasks: 'gemini-3-pro-preview'
+ * - Basic Text Tasks: 'gemini-3-flash-preview'
+ * - Fallback: 'gemini-flash-lite-latest'
+ */
 const MODELS_SEQUENCE = [
-  'gemini-flash-lite-latest',      // 第一順位: gemini-2.5-flash-lite
-  'gemini-2.5-flash-preview-tts', // 第二順位: gemini-2.5-flash-tts
-  'gemini-flash-latest',          // 第三順位: gemini-2.5-flash
-  'gemini-3-flash-preview'        // 第四順位: gemini-3-flash
+  'gemini-3-pro-preview',
+  'gemini-3-flash-preview',
+  'gemini-flash-lite-latest'
 ];
 
 export const getSuitabilityAnalysis = async (data: AssessmentData) => {
+  // Use process.env.API_KEY exclusively as per guidelines.
+  // The API_KEY is provided via the environment.
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey || apiKey === "undefined") {
+    throw new Error("API Key 尚未設定。請確認環境變數 API_KEY。");
+  }
+
   const taskListStr = data.tasks.map(t => `${t.name} (${t.hours}小時)`).join(', ');
   
   const prompt = `
@@ -30,21 +43,21 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
        - 活動策劃引導 (Activity & Planning)
     2. 生成「個人適性建議」(Suitability Advice)：
        - 請以「照顧管家」身分為核心。
-       - **絕對不要**提供其他職業名稱或職稱。
        - 應側重說明該管家展現出的核心能力價值。
        - 必須包含具體的「自我成長方向」建議。
     3. 生成「AI 可以怎麼協助你」(AI Assistance)：
        - 必須以「列表 (List)」方式呈現。
-       - 針對填寫者感興趣的項目或執行任務，提出具體的 AI 協助方式。
-       - 推薦對應的 AI 工具名稱。
+       - 推薦具體的 AI 工具名稱。
 
     請以 JSON 格式回覆。
   `;
 
   for (const modelName of MODELS_SEQUENCE) {
     try {
-      console.log(`嘗試使用模型: ${modelName}`);
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      console.log(`正在嘗試呼叫 AI 模型: ${modelName}`);
+      
+      // Create a new GoogleGenAI instance right before the call to ensure the latest API key is used.
+      const ai = new GoogleGenAI({ apiKey: apiKey });
       
       const response = await ai.models.generateContent({
         model: modelName,
@@ -63,37 +76,43 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
                   living: { type: Type.NUMBER },
                   activity: { type: Type.NUMBER }
                 },
-                required: ['emotional', 'medical', 'admin', 'living', 'activity']
+                required: ['emotional', 'medical', 'admin', 'living', 'activity'],
+                propertyOrdering: ['emotional', 'medical', 'admin', 'living', 'activity']
               },
               suitabilityAdvice: { type: Type.STRING },
               aiAssistance: { type: Type.STRING }
             },
-            required: ['scores', 'suitabilityAdvice', 'aiAssistance']
+            required: ['scores', 'suitabilityAdvice', 'aiAssistance'],
+            propertyOrdering: ['scores', 'suitabilityAdvice', 'aiAssistance']
           }
         }
       });
 
+      // Directly access .text property from GenerateContentResponse.
       const text = response.text;
       if (!text) throw new Error("AI 模型回傳空內容");
 
-      // 安全解析 JSON，移除可能存在的 Markdown 標籤
-      const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(cleanJson);
+      return JSON.parse(text.trim());
 
     } catch (error: any) {
       const errorMessage = error.message || String(error);
       console.error(`模型 ${modelName} 呼叫失敗:`, errorMessage);
 
-      // 判斷是否為配額限制或可重試錯誤
+      // Stop if API key is explicitly invalid.
+      if (errorMessage.includes("API key not valid")) {
+        throw new Error("您提供的 API Key 無效，請確認金鑰是否正確。");
+      }
+
       const isRetryable = 
         errorMessage.includes("429") || 
         errorMessage.toLowerCase().includes("quota") ||
         errorMessage.toLowerCase().includes("limit") ||
-        errorMessage.toLowerCase().includes("exhausted") ||
-        errorMessage.toLowerCase().includes("not found"); // 有些帳號可能不支援特定模型
+        errorMessage.toLowerCase().includes("not found") ||
+        errorMessage.toLowerCase().includes("permission denied");
 
+      // Try the next model in sequence if the error is retryable.
       if (isRetryable && modelName !== MODELS_SEQUENCE[MODELS_SEQUENCE.length - 1]) {
-        console.warn(`嘗試切換至下一個模型...`);
+        console.warn(`[Fallback] 模型 ${modelName} 無法使用，嘗試下一個...`);
         continue;
       } else {
         throw new Error(modelName === MODELS_SEQUENCE[MODELS_SEQUENCE.length - 1] && isRetryable ? "額度已用完" : errorMessage);
