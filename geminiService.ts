@@ -2,9 +2,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AssessmentData } from "./types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const getSuitabilityAnalysis = async (data: AssessmentData) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const model = 'gemini-3-flash-preview';
   
   const taskListStr = data.tasks.map(t => `${t.name} (${t.hours}小時)`).join(', ');
@@ -65,5 +64,10 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
     }
   });
 
-  return JSON.parse(response.text);
+  const text = response.text;
+  if (!text) {
+    throw new Error("AI 模型未回傳任何內容");
+  }
+
+  return JSON.parse(text);
 };
