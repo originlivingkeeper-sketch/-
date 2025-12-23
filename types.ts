@@ -5,6 +5,8 @@ export interface TaskEntry {
 }
 
 export interface AssessmentData {
+  userName: string;
+  totalWeeklyHours: number;
   tasks: TaskEntry[];
   otherTasks: string;
   interests: string[];
@@ -17,6 +19,17 @@ export interface AnalysisResult {
     A: number;
     fullMark: number;
   }>;
+  pieData: Array<{
+    name: string;
+    value: number;
+    color: string;
+  }>;
   suitabilityAdvice: string;
   aiAssistance: string;
+  summary: {
+    userName: string;
+    totalWeeklyHours: number;
+    trackedHours: number;
+    miscHours: number;
+  };
 }
