@@ -9,7 +9,7 @@
 2. **在 Render 建立 Static Site**：
    - 連結您的 GitHub 帳戶並選擇此專案。
    - **Build Command**: `npm install && npm run build`
-   - **Publish Directory**: `dist`
+   - **Publish Directory**: `build` (請確保設定為 build 而非 dist)
 3. **設定環境變數**：
    - 在 Render 的 Dashboard 中，進入該專案的 **Environment**。
    - 新增變數 `API_KEY`，數值填入您的 Google Gemini API Key。
@@ -17,8 +17,8 @@
 
 ## 技術棧
 - React 19
-- Vite
-- Google Gemini API
+- Vite (輸出目錄設為 build)
+- Google Gemini API (支援模型降級機制)
 - Tailwind CSS
-- Recharts (雷達圖)
-- Lucide React (圖標)
+- Recharts
+- Lucide React

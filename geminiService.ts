@@ -3,9 +3,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AssessmentData } from "./types";
 
 const MODELS_SEQUENCE = [
-  'gemini-flash-lite-latest',      // 第一順位: gemini-2.5-flash-lite (對應最新 lite)
+  'gemini-flash-lite-latest',      // 第一順位: gemini-2.5-flash-lite
   'gemini-2.5-flash-preview-tts', // 第二順位: gemini-2.5-flash-tts
-  'gemini-flash-latest',          // 第三順位: gemini-2.5-flash (對應最新 flash)
+  'gemini-flash-latest',          // 第三順位: gemini-2.5-flash
   'gemini-3-flash-preview'        // 第四順位: gemini-3-flash
 ];
 
@@ -35,17 +35,17 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
        - 必須包含具體的「自我成長方向」建議。
     3. 生成「AI 可以怎麼協助你」(AI Assistance)：
        - 必須以「列表 (List)」方式呈現。
-       - 針對填寫者感興趣的項目或執行任務，提出具體的 AI 協助方式（例如：自動化工具、提示詞應用、內容生成等）。
-       - 推薦對應的 AI 工具名稱（如 ChatGPT, Midjourney, Notion AI 等）。
+       - 針對填寫者感興趣的項目或執行任務，提出具體的 AI 協助方式。
+       - 推薦對應的 AI 工具名稱。
 
     請以 JSON 格式回覆。
   `;
 
-  let lastError: any = null;
-
   for (const modelName of MODELS_SEQUENCE) {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      console.log(`嘗試使用模型: ${modelName}`);
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      
       const response = await ai.models.generateContent({
         model: modelName,
         contents: prompt,
@@ -74,29 +74,31 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
       });
 
       const text = response.text;
-      if (!text) {
-        throw new Error("AI 模型未回傳內容");
-      }
+      if (!text) throw new Error("AI 模型回傳空內容");
 
-      return JSON.parse(text);
+      // 安全解析 JSON，移除可能存在的 Markdown 標籤
+      const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(cleanJson);
+
     } catch (error: any) {
-      lastError = error;
-      const errorMessage = error.message || "";
-      // 判斷是否為配額限制 (429 Too Many Requests 或包含 quota 字眼)
-      const isQuotaError = errorMessage.includes("429") || 
-                           errorMessage.toLowerCase().includes("quota") ||
-                           errorMessage.toLowerCase().includes("limit");
+      const errorMessage = error.message || String(error);
+      console.error(`模型 ${modelName} 呼叫失敗:`, errorMessage);
 
-      if (isQuotaError) {
-        console.warn(`模型 ${modelName} 額度已達上限，嘗試切換至下一個模型...`);
-        continue; // 嘗試下一個模型
+      // 判斷是否為配額限制或可重試錯誤
+      const isRetryable = 
+        errorMessage.includes("429") || 
+        errorMessage.toLowerCase().includes("quota") ||
+        errorMessage.toLowerCase().includes("limit") ||
+        errorMessage.toLowerCase().includes("exhausted") ||
+        errorMessage.toLowerCase().includes("not found"); // 有些帳號可能不支援特定模型
+
+      if (isRetryable && modelName !== MODELS_SEQUENCE[MODELS_SEQUENCE.length - 1]) {
+        console.warn(`嘗試切換至下一個模型...`);
+        continue;
       } else {
-        // 其他類型的錯誤（如驗證錯誤、網路中斷等）直接拋出，不進行降級
-        throw error;
+        throw new Error(modelName === MODELS_SEQUENCE[MODELS_SEQUENCE.length - 1] && isRetryable ? "額度已用完" : errorMessage);
       }
     }
   }
-
-  // 如果所有模型都嘗試過且都失敗（或是最後一個模型也配額用盡）
-  throw new Error("額度已用完");
+  throw new Error("無法取得分析結果");
 };
