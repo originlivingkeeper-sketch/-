@@ -1,11 +1,24 @@
-<div align="center">
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+# 照顧管家適性判斷系統
 
-  <h1>Built with AI Studio</h2>
+專業的人力管理工具，針對「照顧管家」進行適性判斷、任務分析與 AI 轉型建議。
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+## 部署至 Render 步驟：
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+1. **上傳至 GitHub**：將所有檔案推送到您的 GitHub 儲存庫。
+2. **在 Render 建立 Static Site**：
+   - 連結您的 GitHub 帳戶並選擇此專案。
+   - **Build Command**: `npm install && npm run build`
+   - **Publish Directory**: `dist`
+3. **設定環境變數**：
+   - 在 Render 的 Dashboard 中，進入該專案的 **Environment**。
+   - 新增變數 `API_KEY`，數值填入您的 Google Gemini API Key。
+4. **完成發布**：Render 將自動建置並提供專屬網址。
 
-</div>
+## 技術棧
+- React 19
+- Vite
+- Google Gemini API
+- Tailwind CSS
+- Recharts (雷達圖)
+- Lucide React (圖標)
