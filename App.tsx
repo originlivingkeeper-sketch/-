@@ -15,15 +15,17 @@ import {
   CheckCircle2,
   Heart,
   Download,
-  ArrowRight
+  ArrowRight,
+  AlertTriangle
 } from 'lucide-react';
-import { AssessmentData, AnalysisResult, TaskEntry } from './types';
+import { AssessmentData, AnalysisResult } from './types';
 import { SKILL_OPTIONS, INTEREST_OPTIONS, RADAR_CATEGORIES } from './constants';
 import { getSuitabilityAnalysis } from './geminiService';
 
 const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const [formData, setFormData] = useState<AssessmentData>({
     tasks: [],
     otherTasks: '',
@@ -74,6 +76,7 @@ const App: React.FC = () => {
     }
     setLoading(true);
     setShowResult(true);
+    setErrorStatus(null);
     try {
       const apiResult = await getSuitabilityAnalysis(formData);
       const radarData = RADAR_CATEGORIES.map(cat => ({
@@ -90,10 +93,13 @@ const App: React.FC = () => {
       setTimeout(() => {
         document.getElementById('analysis-result')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Analysis failed', error);
-      alert('分析過程中發生錯誤，請稍後再試。');
-      setShowResult(false);
+      if (error.message === "額度已用完") {
+        setErrorStatus("額度已用完");
+      } else {
+        setErrorStatus("分析過程中發生錯誤，請稍後再試。");
+      }
     } finally {
       setLoading(false);
     }
@@ -105,7 +111,7 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto p-4 md:p-8 pb-24 text-stone-800">
-      {/* Header hidden on print */}
+      {/* Header */}
       <header className="mb-12 text-center print:block">
         <h1 className="text-3xl md:text-5xl font-extrabold text-stone-900 flex items-center justify-center gap-3">
           <Briefcase className="text-amber-600 w-10 h-10 md:w-12 md:h-12" />
@@ -114,8 +120,8 @@ const App: React.FC = () => {
         <p className="text-stone-500 mt-4 text-lg print:hidden">專業職能評估與 AI 協作轉型建議</p>
       </header>
 
-      {/* Input Form Section - hidden on print if result is shown */}
-      <div className={`space-y-8 ${showResult ? 'print:hidden' : ''}`}>
+      {/* Input Form Section */}
+      <div className={`space-y-8 ${showResult ? 'hidden md:block print:hidden' : ''}`}>
         <section className="bg-white rounded-3xl shadow-sm border border-stone-100 p-6 md:p-10">
           <h2 className="text-2xl font-bold text-stone-800 mb-6 flex items-center gap-3">
             <CheckCircle2 className="text-amber-600" />
@@ -234,7 +240,28 @@ const App: React.FC = () => {
           {loading ? (
             <div className="h-96 flex flex-col items-center justify-center text-stone-400 print:hidden">
               <Loader2 className="animate-spin mb-4 text-amber-600" size={48} />
-              <p className="text-xl animate-pulse">正在生成專業適性報告與雷達圖...</p>
+              <p className="text-xl animate-pulse text-center">正在切換模型並優化分析結果...<br/><span className="text-sm font-normal">這可能需要幾秒鐘</span></p>
+            </div>
+          ) : errorStatus ? (
+            <div className="bg-white border-2 border-rose-100 rounded-3xl p-12 text-center max-w-2xl mx-auto shadow-xl shadow-rose-50">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-rose-50 rounded-full mb-6 text-rose-500">
+                <AlertTriangle size={40} />
+              </div>
+              <h3 className="text-2xl font-bold text-stone-800 mb-4">{errorStatus}</h3>
+              <p className="text-stone-500 mb-8 leading-relaxed">
+                {errorStatus === "額度已用完" 
+                  ? "目前所有 AI 模型的配額都已暫時用罄，請稍候再試或聯繫管理人員。" 
+                  : "目前無法處理您的分析請求，請確認網路連線或稍後再試。"}
+              </p>
+              <button 
+                onClick={() => {
+                  setShowResult(false);
+                  setErrorStatus(null);
+                }}
+                className="bg-stone-800 hover:bg-stone-900 text-white px-8 py-3 rounded-xl font-bold transition-all"
+              >
+                回上一頁重新嘗試
+              </button>
             </div>
           ) : result && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-10 duration-1000 print:space-y-4">
@@ -291,7 +318,6 @@ const App: React.FC = () => {
                     {result.aiAssistance.split('\n').map((line, i) => {
                       const trimmedLine = line.trim();
                       if (!trimmedLine) return null;
-                      // Detect if it's a list item
                       const isListItem = trimmedLine.startsWith('-') || trimmedLine.match(/^\d\./);
                       return (
                         <div key={i} className={`flex gap-3 ${isListItem ? 'pl-4' : 'font-bold text-orange-200 mt-4 print:text-orange-900'}`}>
@@ -320,6 +346,7 @@ const App: React.FC = () => {
                 <button 
                   onClick={() => {
                     setShowResult(false);
+                    setErrorStatus(null);
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="text-stone-500 font-bold hover:text-amber-600 transition-colors flex items-center gap-2 px-6 py-2 rounded-full hover:bg-stone-100"
@@ -327,45 +354,10 @@ const App: React.FC = () => {
                   重新調整資料
                 </button>
               </div>
-              
-              {/* Footer text for print only */}
-              <div className="hidden print:block text-center text-stone-400 text-xs pt-10">
-                照顧管家適性判斷系統報告 - 由 AI 技術分析生成
-              </div>
             </div>
           )}
         </div>
       )}
-
-      {/* Styles for print */}
-      <style>{`
-        @media print {
-          body {
-            background-color: white !important;
-          }
-          .max-w-5xl {
-            max-width: 100%;
-            padding: 0;
-            margin: 0;
-          }
-          header h1 {
-            color: #44403c !important;
-            font-size: 24pt;
-          }
-          #analysis-result {
-            margin-top: 0;
-          }
-          .recharts-responsive-container {
-            break-inside: avoid;
-          }
-          h3 {
-            color: #b45309 !important;
-          }
-          .bg-stone-50 {
-            background-color: white !important;
-          }
-        }
-      `}</style>
     </div>
   );
 };

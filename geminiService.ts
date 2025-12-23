@@ -2,10 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AssessmentData } from "./types";
 
+const MODELS_SEQUENCE = [
+  'gemini-flash-lite-latest',      // 第一順位: gemini-2.5-flash-lite (對應最新 lite)
+  'gemini-2.5-flash-preview-tts', // 第二順位: gemini-2.5-flash-tts
+  'gemini-flash-latest',          // 第三順位: gemini-2.5-flash (對應最新 flash)
+  'gemini-3-flash-preview'        // 第四順位: gemini-3-flash
+];
+
 export const getSuitabilityAnalysis = async (data: AssessmentData) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const model = 'gemini-3-flash-preview';
-  
   const taskListStr = data.tasks.map(t => `${t.name} (${t.hours}小時)`).join(', ');
   
   const prompt = `
@@ -37,37 +41,62 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
     請以 JSON 格式回覆。
   `;
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          scores: {
+  let lastError: any = null;
+
+  for (const modelName of MODELS_SEQUENCE) {
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
             type: Type.OBJECT,
             properties: {
-              emotional: { type: Type.NUMBER },
-              medical: { type: Type.NUMBER },
-              admin: { type: Type.NUMBER },
-              living: { type: Type.NUMBER },
-              activity: { type: Type.NUMBER }
+              scores: {
+                type: Type.OBJECT,
+                properties: {
+                  emotional: { type: Type.NUMBER },
+                  medical: { type: Type.NUMBER },
+                  admin: { type: Type.NUMBER },
+                  living: { type: Type.NUMBER },
+                  activity: { type: Type.NUMBER }
+                },
+                required: ['emotional', 'medical', 'admin', 'living', 'activity']
+              },
+              suitabilityAdvice: { type: Type.STRING },
+              aiAssistance: { type: Type.STRING }
             },
-            required: ['emotional', 'medical', 'admin', 'living', 'activity']
-          },
-          suitabilityAdvice: { type: Type.STRING },
-          aiAssistance: { type: Type.STRING }
-        },
-        required: ['scores', 'suitabilityAdvice', 'aiAssistance']
+            required: ['scores', 'suitabilityAdvice', 'aiAssistance']
+          }
+        }
+      });
+
+      const text = response.text;
+      if (!text) {
+        throw new Error("AI 模型未回傳內容");
+      }
+
+      return JSON.parse(text);
+    } catch (error: any) {
+      lastError = error;
+      const errorMessage = error.message || "";
+      // 判斷是否為配額限制 (429 Too Many Requests 或包含 quota 字眼)
+      const isQuotaError = errorMessage.includes("429") || 
+                           errorMessage.toLowerCase().includes("quota") ||
+                           errorMessage.toLowerCase().includes("limit");
+
+      if (isQuotaError) {
+        console.warn(`模型 ${modelName} 額度已達上限，嘗試切換至下一個模型...`);
+        continue; // 嘗試下一個模型
+      } else {
+        // 其他類型的錯誤（如驗證錯誤、網路中斷等）直接拋出，不進行降級
+        throw error;
       }
     }
-  });
-
-  const text = response.text;
-  if (!text) {
-    throw new Error("AI 模型未回傳任何內容");
   }
 
-  return JSON.parse(text);
+  // 如果所有模型都嘗試過且都失敗（或是最後一個模型也配額用盡）
+  throw new Error("額度已用完");
 };
