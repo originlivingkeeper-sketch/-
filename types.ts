@@ -13,6 +13,12 @@ export interface AssessmentData {
   otherInterests: string;
 }
 
+export interface NotionConfig {
+  apiKey: string;
+  databaseId: string;
+  useProxy: boolean;
+}
+
 export interface AnalysisResult {
   radarData: Array<{
     subject: string;
@@ -26,10 +32,12 @@ export interface AnalysisResult {
   }>;
   suitabilityAdvice: string;
   aiAssistance: string;
+  tags: string[];
   summary: {
     userName: string;
     totalWeeklyHours: number;
     trackedHours: number;
     miscHours: number;
+    otherTaskHours: number;
   };
 }

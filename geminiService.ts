@@ -29,25 +29,26 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
     4. 其他興趣補充：${data.otherInterests || '無'}
 
     【任務指令】
-    請根據上述數據進行嚴謹的分析，並產出以下內容：
+    請產出以下內容：
 
-    1. 為以下五個職能維度進行 0-100 的定量評分：
+    1. 為五個職能維度評分 (0-100)：
        - 情感支持與社交 (Emotional Support & Social)
        - 醫藥安全監測 (Medical & Safety)
        - 行政管理效能 (Admin & Management)
        - 生活支援實務 (Living Support)
        - 活動策劃引導 (Activity & Planning)
 
-    2. 撰寫極為詳盡的「個人適性建議」(Suitability Advice)：
-       - 開頭請親切地稱呼「${data.userName}」。
-       - 深度分析其目前的時間分配比例與其感興趣領域的「重合度」或「偏離度」。
-       - **請撰寫至少 600 字以上的專業職能分析**，包含對其工作穩定度、專業深度、與長輩溝通潛力的評估。
-       - 必須提到管家作為長輩生活夥伴的核心價值。
-       - 給予三個具體、可落實的職業成長策略（如：進修證照、轉向管理職、或深化特殊照護技術）。
-       - 請確保語氣專業、鼓舞人心且充滿洞察力。
+    2. 從以下標籤清單中，挑選 2-4 個最符合該人才特質的標籤：
+       標籤清單：打掃專門、打掃很厲害、很能聊天、生活大專家、運動專業戶、行政人才、都在打字、社交鬼才。
 
-    3. 生成「AI 可以怎麼協助你」(AI Assistance)：
-       - 提供 3-5 個具體的 AI 工具應用情境（例如：使用語音轉文字自動生成服務紀錄、利用 AI 規劃個人化健康餐單等）。
+    3. 撰寫「個人適性建議」(Suitability Advice)：
+       - 開頭親切稱呼「${data.userName}」。
+       - 分析時數分配與感興趣領域的契合度。
+       - **撰寫至少 600 字以上的專業職能分析**，不要使用大首字，維持一般文字。
+       - 給予三個職業成長策略。
+
+    4. 生成「AI 可以怎麼協助你」(AI Assistance)：
+       - 提供 3-5 個具體的 AI 工具應用情境。
 
     請嚴格遵守 JSON 格式回覆。
   `;
@@ -74,10 +75,14 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
                 },
                 required: ['emotional', 'medical', 'admin', 'living', 'activity']
               },
+              tags: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
               suitabilityAdvice: { type: Type.STRING },
               aiAssistance: { type: Type.STRING }
             },
-            required: ['scores', 'suitabilityAdvice', 'aiAssistance']
+            required: ['scores', 'tags', 'suitabilityAdvice', 'aiAssistance']
           }
         }
       });
@@ -86,7 +91,6 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
       if (!text) throw new Error("AI 模型回傳空內容");
       return JSON.parse(text.trim());
     } catch (error: any) {
-      console.warn(`嘗試模型 ${modelName} 失敗:`, error);
       if (modelName === MODELS_SEQUENCE[MODELS_SEQUENCE.length - 1]) throw error;
       continue;
     }
