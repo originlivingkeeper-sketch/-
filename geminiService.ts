@@ -28,22 +28,22 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
 
     【分析指令】
     1. 職能評分 (0-100)：
-       - 情感支持與社交、醫藥安全監測、行政管理效能、生活支援實務、活動策劃引導。
+       針對「情感支持與社交、醫藥安全監測、行政管理效能、生活支援實務、活動策劃引導」五項給分。
 
-    2. 深度剖析 (Suitability Advice)：
-       - 以「照顧管家的工作效率與量能」為前提，結合個人興趣進行剖析。
-       - 分析其實際執行的任務與其興趣是否契合。
-       - **撰寫至少 800 字的專業分析**，段落分明，語氣親切且具指導性。
+    2. 工作效率與量能剖析 (Suitability Advice)：
+       - 以「照顧管家的工作效率與量能」為前提，進行個人興趣剖析。
+       - 分析其勾選的任務時數與個人興趣是否達成正向循環。
+       - 撰寫至少 800 字，口吻專業、細膩且具行政指導意義。
 
-    3. AI 協作建議 (AI Assistance)：
+    3. AI 協助方案 (AI Assistance)：
        - 針對此人的個人興趣與適才項目，列出「哪些生成式 AI 或工具可以協助任務執行」。
-       - 提供具體的應用場景。
+       - 提供具體工具名稱（如 ChatGPT, Midjourney, Notion AI 等）與應用情境。
 
-    4. 給予標籤 (Tags)：
-       - **必須**且**僅能**從以下清單中選擇 2-4 個：
+    4. 指定人才標籤 (Tags)：
+       - **必須**從以下清單中選擇 3-4 個最適標籤，嚴禁自創：
        「打掃專門」、「打掃很厲害」、「很能聊天」、「生活大專家」、「運動專業戶」、「行政人才」、「都在打字」、「社交鬼才」。
 
-    請嚴格遵守 JSON 格式回覆。
+    請以 JSON 格式回覆。
   `;
 
   for (const modelName of MODELS_SEQUENCE) {
@@ -80,7 +80,9 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
         }
       });
 
-      return JSON.parse(response.text.trim());
+      const text = response.text;
+      if (!text) throw new Error("Empty response");
+      return JSON.parse(text.trim());
     } catch (error: any) {
       if (modelName === MODELS_SEQUENCE[MODELS_SEQUENCE.length - 1]) throw error;
       continue;

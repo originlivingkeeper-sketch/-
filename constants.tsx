@@ -1,11 +1,4 @@
 
-import React from 'react';
-import { 
-  HeartHandshake, Stethoscope, ClipboardCheck, FileText, Settings, Trash2, 
-  Dumbbell, Users, Palette, Utensils, Activity, AlertCircle, MessagesSquare, 
-  Moon, Coffee, Navigation 
-} from 'lucide-react';
-
 export const SKILL_OPTIONS = [
   { id: 'chat', label: '長輩陪伴聊天談心' },
   { id: 'medical_escort', label: '陪伴就醫' },
@@ -27,12 +20,12 @@ export const SKILL_OPTIONS = [
 ];
 
 export const INTEREST_OPTIONS = [
-  { id: 'int_clean', label: '居家環境整理' },
-  { id: 'int_talk', label: '與人交流互動' },
-  { id: 'int_health', label: '健康與醫療照護' },
-  { id: 'int_logic', label: '流程規劃與行政' },
-  { id: 'int_creative', label: '手作與創意活動' },
-  { id: 'int_tech', label: '科技工具應用' }
+  { id: 'int_1', label: '居家環境整理與美化' },
+  { id: 'int_2', label: '深度人際溝通與陪伴' },
+  { id: 'int_3', label: '健康促進與醫療照護' },
+  { id: 'int_4', label: '行政邏輯與數位管理' },
+  { id: 'int_5', label: '創意手作與節慶活動' },
+  { id: 'int_6', label: '戶外運動與肌力訓練' }
 ];
 
 export const RADAR_CATEGORIES = [
