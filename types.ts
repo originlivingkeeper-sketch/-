@@ -16,7 +16,8 @@ export interface AssessmentData {
 export interface NotionConfig {
   apiKey: string;
   databaseId: string;
-  useProxy: boolean;
+  webhookUrl: string; // 新增 Webhook 欄位
+  mode: 'api' | 'webhook'; // 增加模式切換
 }
 
 export interface AnalysisResult {
