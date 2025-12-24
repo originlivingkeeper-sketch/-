@@ -10,45 +10,38 @@ const MODELS_SEQUENCE = [
 
 export const getSuitabilityAnalysis = async (data: AssessmentData) => {
   if (!process.env.API_KEY || process.env.API_KEY === "undefined") {
-    throw new Error("API Key 尚未設定。請確認環境變數 API_KEY。");
+    throw new Error("API Key 尚未設定。");
   }
 
   const taskListStr = data.tasks.map(t => `${t.name} (${t.hours}小時)`).join(', ');
   
   const prompt = `
-    你是一位資深的人力管理主管與職能分析專家，正在為一位「照顧管家」撰寫深度的人才適性評估報告。
+    你是一位資深的人力管理主管與職能分析專家，正在為一位「照顧管家」撰寫深度的人才評估報告。
     
-    【受測人才基本資訊】
+    【輸入數據】
     - 姓名：${data.userName}
-    - 上周總工時：${data.totalWeeklyHours} 小時
-    
-    【目前執行狀況明細】
-    1. 具體列出的任務與時數：${taskListStr}
-    2. 其他補充任務：${data.otherTasks || '無'}
-    3. 特別感興趣的領域：${data.interests.join(', ')}
-    4. 其他興趣補充：${data.otherInterests || '無'}
+    - 總工時：${data.totalWeeklyHours} 小時
+    - 任務：${taskListStr}
+    - 其他補充：${data.otherTasks}
+    - 興趣項目：${data.interests.join(', ')}
+    - 其他興趣補充：${data.otherInterests}
 
-    【任務指令】
-    請產出以下內容：
+    【分析指令】
+    1. 職能評分 (0-100)：
+       - 情感支持與社交、醫藥安全監測、行政管理效能、生活支援實務、活動策劃引導。
 
-    1. 為五個職能維度評分 (0-100)：
-       - 情感支持與社交 (Emotional Support & Social)
-       - 醫藥安全監測 (Medical & Safety)
-       - 行政管理效能 (Admin & Management)
-       - 生活支援實務 (Living Support)
-       - 活動策劃引導 (Activity & Planning)
+    2. 深度剖析 (Suitability Advice)：
+       - 以「照顧管家的工作效率與量能」為前提，結合個人興趣進行剖析。
+       - 分析其實際執行的任務與其興趣是否契合。
+       - **撰寫至少 800 字的專業分析**，段落分明，語氣親切且具指導性。
 
-    2. 從以下標籤清單中，挑選 2-4 個最符合該人才特質的標籤：
-       標籤清單：打掃專門、打掃很厲害、很能聊天、生活大專家、運動專業戶、行政人才、都在打字、社交鬼才。
+    3. AI 協作建議 (AI Assistance)：
+       - 針對此人的個人興趣與適才項目，列出「哪些生成式 AI 或工具可以協助任務執行」。
+       - 提供具體的應用場景。
 
-    3. 撰寫「個人適性建議」(Suitability Advice)：
-       - 開頭親切稱呼「${data.userName}」。
-       - 分析時數分配與感興趣領域的契合度。
-       - **撰寫至少 600 字以上的專業職能分析**，不要使用大首字，維持一般文字。
-       - 給予三個職業成長策略。
-
-    4. 生成「AI 可以怎麼協助你」(AI Assistance)：
-       - 提供 3-5 個具體的 AI 工具應用情境。
+    4. 給予標籤 (Tags)：
+       - **必須**且**僅能**從以下清單中選擇 2-4 個：
+       「打掃專門」、「打掃很厲害」、「很能聊天」、「生活大專家」、「運動專業戶」、「行政人才」、「都在打字」、「社交鬼才」。
 
     請嚴格遵守 JSON 格式回覆。
   `;
@@ -87,9 +80,7 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
         }
       });
 
-      const text = response.text;
-      if (!text) throw new Error("AI 模型回傳空內容");
-      return JSON.parse(text.trim());
+      return JSON.parse(response.text.trim());
     } catch (error: any) {
       if (modelName === MODELS_SEQUENCE[MODELS_SEQUENCE.length - 1]) throw error;
       continue;

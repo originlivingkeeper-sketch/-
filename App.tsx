@@ -1,43 +1,16 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer,
   PieChart, Pie, Cell, Tooltip
 } from 'recharts';
 import { 
-  UserCircle, 
-  Loader2, 
-  Sparkles, 
-  Briefcase, 
-  BarChart3,
-  Cpu,
-  Plus,
-  Minus,
-  Heart,
-  Download,
-  ArrowRight,
-  AlertTriangle,
-  User,
-  Clock,
-  PieChart as PieIcon,
-  ListChecks,
-  Tag,
-  Share2,
-  Settings2,
-  Check,
-  Copy,
-  Database,
-  ShieldCheck,
-  Send,
-  HelpCircle,
-  ExternalLink as ExternalIcon,
-  ChevronDown,
-  ChevronUp,
-  Zap,
-  Globe,
-  Info
+  UserCircle, Loader2, Sparkles, Briefcase, BarChart3, Plus, Minus,
+  Download, User, Clock, PieChart as PieIcon, Send, Copy, Database,
+  Zap, ChevronUp, ChevronDown, Check, Info, ListOrdered, Heart,
+  FileText, MessageSquare
 } from 'lucide-react';
-import { AssessmentData, AnalysisResult, NotionConfig } from './types';
+import { AssessmentData, AnalysisResult, NotionConfig, TaskEntry } from './types';
 import { SKILL_OPTIONS, INTEREST_OPTIONS, RADAR_CATEGORIES } from './constants';
 import { getSuitabilityAnalysis } from './geminiService';
 
@@ -46,9 +19,8 @@ const COLORS = ['#d97706', '#f59e0b', '#fbbf24', '#fcd34d', '#fef3c7', '#78716c'
 const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
-  const [errorStatus, setErrorStatus] = useState<string | null>(null);
   const [showNotionModal, setShowNotionModal] = useState(false);
-  const [showWebhookHelp, setShowWebhookHelp] = useState(true); // 預設開啟教學
+  const [showWebhookHelp, setShowWebhookHelp] = useState(false);
   const [notionCopied, setNotionCopied] = useState(false);
   const [notionSaving, setNotionSaving] = useState(false);
   const [notionSuccess, setNotionSuccess] = useState(false);
@@ -57,10 +29,6 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('notion_config');
     return saved ? JSON.parse(saved) : { apiKey: '', databaseId: '', webhookUrl: '', mode: 'webhook' };
   });
-
-  useEffect(() => {
-    localStorage.setItem('notion_config', JSON.stringify(notionConfig));
-  }, [notionConfig]);
 
   const [formData, setFormData] = useState<AssessmentData>({
     userName: '',
@@ -71,6 +39,18 @@ const App: React.FC = () => {
     otherInterests: ''
   });
   const [result, setResult] = useState<AnalysisResult | null>(null);
+
+  // Regex 提取時數邏輯
+  const extractedOtherTaskHours = useMemo(() => {
+    if (!formData.otherTasks) return 0;
+    const regex = /(\d+(\.\d+)?)\s*(小時|h|H|hr|HR)/g;
+    let match;
+    let total = 0;
+    while ((match = regex.exec(formData.otherTasks)) !== null) {
+      total += parseFloat(match[1]);
+    }
+    return total;
+  }, [formData.otherTasks]);
 
   const handleTaskToggle = (label: string) => {
     const exists = formData.tasks.find(t => t.name === label);
@@ -88,56 +68,13 @@ const App: React.FC = () => {
     }));
   };
 
-  const generateNotionMarkdown = () => {
-    if (!result) return "";
-    return `# 照顧管家職能鑑定：${result.summary.userName}\n> 生成日期：${new Date().toLocaleDateString()}\n\n${result.tags.map(t => `\`#${t}\``).join(' ')}\n\n## 📊 核心職能評分\n${result.radarData.map(d => `- **${d.subject}**: ${d.A}/100`).join('\n')}\n\n## 📝 主管深度評語\n${result.suitabilityAdvice}\n\n--- \n*由照顧管家系統產出*`;
-  };
-
-  const copyToNotion = () => {
-    navigator.clipboard.writeText(generateNotionMarkdown());
-    setNotionCopied(true);
-    setTimeout(() => setNotionCopied(false), 2000);
-  };
-
-  const handleSaveToNotion = async () => {
-    if (notionConfig.mode === 'api') {
-      alert("由於 Notion CORS 限制，前端無法直連 API。請改用『穩定模式』。");
-      return;
-    }
-
-    if (!notionConfig.webhookUrl) {
-      alert("請先填入 Make.com 提供的 Webhook URL。");
-      return;
-    }
-
-    setNotionSaving(true);
-    try {
-      const payload = {
-        userName: result?.summary.userName || "測試人員",
-        tags: result?.tags || ["測試標籤"],
-        scores: result?.radarData.map(d => ({ [d.subject]: d.A })),
-        advice: result?.suitabilityAdvice || "這是一份測試資料",
-        timestamp: new Date().toLocaleString('zh-TW')
-      };
-
-      const response = await fetch(notionConfig.webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) throw new Error("傳輸失敗");
-      
-      setNotionSuccess(true);
-      setTimeout(() => {
-        setNotionSuccess(false);
-        if (result) setShowNotionModal(false);
-      }, 2500);
-    } catch (err) {
-      alert("傳送失敗！請確保 Make.com 的 Webhook 處於『Waiting for data』狀態。");
-    } finally {
-      setNotionSaving(false);
-    }
+  const handleInterestToggle = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      interests: prev.interests.includes(id) 
+        ? prev.interests.filter(i => i !== id) 
+        : [...prev.interests, id]
+    }));
   };
 
   const runAnalysis = async () => {
@@ -146,10 +83,30 @@ const App: React.FC = () => {
     setShowResult(true);
     try {
       const apiResult = await getSuitabilityAnalysis(formData);
-      const radarData = RADAR_CATEGORIES.map(cat => ({ subject: cat.label, A: apiResult.scores[cat.key], fullMark: 100 }));
-      const trackedHours = formData.tasks.reduce((sum, t) => sum + t.hours, 0);
-      const pieData = formData.tasks.map((t, idx) => ({ name: t.name, value: t.hours, color: COLORS[idx % (COLORS.length - 2)] }));
+      const radarData = RADAR_CATEGORIES.map(cat => ({ 
+        subject: cat.label, 
+        A: apiResult.scores[cat.key], 
+        fullMark: 100 
+      }));
+
+      const trackedHours = formData.tasks.reduce((sum, t) => sum + t.hours, 0) + extractedOtherTaskHours;
+      const miscHours = Math.max(0, formData.totalWeeklyHours - trackedHours);
+
+      // 準備圓餅圖數據
+      const pieData: any[] = formData.tasks.map((t, idx) => ({ 
+        name: t.name, 
+        value: t.hours, 
+        color: COLORS[idx % (COLORS.length - 2)] 
+      }));
       
+      if (extractedOtherTaskHours > 0) {
+        pieData.push({ name: '其他補充任務', value: extractedOtherTaskHours, color: '#a8a29e' });
+      }
+      
+      if (miscHours > 0) {
+        pieData.push({ name: '雜項', value: miscHours, color: '#e5e7eb' });
+      }
+
       setResult({
         radarData,
         pieData: pieData.filter(d => d.value > 0),
@@ -160,17 +117,44 @@ const App: React.FC = () => {
           userName: formData.userName,
           totalWeeklyHours: formData.totalWeeklyHours,
           trackedHours,
-          otherTaskHours: 0,
-          miscHours: Math.max(0, formData.totalWeeklyHours - trackedHours)
+          otherTaskHours: extractedOtherTaskHours,
+          miscHours
         }
       });
+
       setTimeout(() => {
         document.getElementById('analysis-result')?.scrollIntoView({ behavior: 'smooth' });
       }, 500);
     } catch (e) {
-      setErrorStatus("分析失敗");
+      alert("分析失敗，請檢查網路連線與 API Key 設定。");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const copyToNotion = () => {
+    if (!result) return;
+    const md = `# 照顧管家職能報告：${result.summary.userName}\n\n${result.tags.map(t => `\#${t}`).join(' ')}\n\n${result.suitabilityAdvice}`;
+    navigator.clipboard.writeText(md);
+    setNotionCopied(true);
+    setTimeout(() => setNotionCopied(false), 2000);
+  };
+
+  const handleSaveToNotion = async () => {
+    if (!notionConfig.webhookUrl) { alert("請填入 Webhook URL"); return; }
+    setNotionSaving(true);
+    try {
+      await fetch(notionConfig.webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...result, timestamp: new Date().toISOString() })
+      });
+      setNotionSuccess(true);
+      setTimeout(() => { setNotionSuccess(false); setShowNotionModal(false); }, 2000);
+    } catch (e) {
+      alert("傳送失敗");
+    } finally {
+      setNotionSaving(false);
     }
   };
 
@@ -179,28 +163,36 @@ const App: React.FC = () => {
       <header className="mb-12 text-center">
         <h1 className="text-3xl md:text-5xl font-extrabold text-stone-900 flex items-center justify-center gap-3">
           <Briefcase className="text-amber-600 w-10 h-10 md:w-12 md:h-12" />
-          照顧管家適性判斷
+          照顧管家適性判斷系統
         </h1>
-        <p className="text-stone-500 mt-2 font-medium tracking-wide">資深人才評核系統</p>
+        <p className="text-stone-500 mt-2 font-medium tracking-wide">資深人才數據分析與 HR 評核</p>
       </header>
 
       {!showResult || loading ? (
-        <div className="space-y-8">
-           <section className="bg-white rounded-3xl shadow-sm p-6 md:p-10 border border-stone-100">
-             <h2 className="text-2xl font-bold mb-6 flex items-center gap-3"><User className="text-amber-600" /> 1. 基本資訊</h2>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <input type="text" className="p-4 rounded-xl border-2 border-stone-100 outline-none focus:border-amber-500 transition-all" placeholder="管家姓名" value={formData.userName} onChange={(e) => setFormData({...formData, userName: e.target.value})} />
-                <input type="number" className="p-4 rounded-xl border-2 border-stone-100 outline-none focus:border-amber-500 transition-all" placeholder="周工時" value={formData.totalWeeklyHours} onChange={(e) => setFormData({...formData, totalWeeklyHours: Number(e.target.value)})} />
+        <div className="space-y-10 animate-in fade-in">
+          {/* 1. 基本資料 */}
+          <section className="bg-white rounded-3xl shadow-sm p-8 border border-stone-100">
+             <h2 className="text-2xl font-bold mb-6 flex items-center gap-3"><User className="text-amber-600" /> 1. 基本資料收集</h2>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <label className="block text-xs font-black text-stone-400 uppercase mb-2">姓名</label>
+                  <input type="text" className="w-full p-4 rounded-xl border-2 border-stone-100 focus:border-amber-500 outline-none" placeholder="管家姓名" value={formData.userName} onChange={(e) => setFormData({...formData, userName: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-stone-400 uppercase mb-2">每周總工時</label>
+                  <input type="number" className="w-full p-4 rounded-xl border-2 border-stone-100 focus:border-amber-500 outline-none" value={formData.totalWeeklyHours} onChange={(e) => setFormData({...formData, totalWeeklyHours: Number(e.target.value)})} />
+                </div>
              </div>
           </section>
 
-          <section className="bg-white rounded-3xl shadow-sm p-6 md:p-10 border border-stone-100">
-            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3"><Clock className="text-amber-600" /> 2. 任務分佈</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* 2. 周任務分布 */}
+          <section className="bg-white rounded-3xl shadow-sm p-8 border border-stone-100">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3"><Clock className="text-amber-600" /> 2. 周任務分布</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                {SKILL_OPTIONS.map(opt => {
                  const task = formData.tasks.find(t => t.name === opt.label);
                  return (
-                   <div key={opt.id} className={`p-4 rounded-2xl border-2 transition-all ${task ? 'border-amber-500 bg-amber-50' : 'border-stone-100'}`}>
+                   <div key={opt.id} className={`p-4 rounded-2xl border-2 transition-all ${task ? 'border-amber-500 bg-amber-50' : 'border-stone-100 hover:border-stone-200'}`}>
                      <label className="flex items-center gap-2 cursor-pointer mb-2">
                        <input type="checkbox" checked={!!task} onChange={() => handleTaskToggle(opt.label)} className="w-4 h-4 text-amber-600" />
                        <span className="text-sm font-bold">{opt.label}</span>
@@ -216,134 +208,174 @@ const App: React.FC = () => {
                  )
                })}
             </div>
+            <div>
+              <label className="block text-xs font-black text-stone-400 uppercase mb-2">其他任務補充 (系統會自動偵測時數，如：陪伴，1.5小時)</label>
+              <textarea 
+                className="w-full p-4 rounded-xl border-2 border-stone-100 focus:border-amber-500 outline-none h-24" 
+                placeholder="請輸入其他任務與時數..." 
+                value={formData.otherTasks} 
+                onChange={(e) => setFormData({...formData, otherTasks: e.target.value})}
+              ></textarea>
+              {extractedOtherTaskHours > 0 && (
+                <div className="mt-2 text-xs font-bold text-amber-600 flex items-center gap-1">
+                  <Check size={14} /> 已偵測到補充時數：{extractedOtherTaskHours} 小時
+                </div>
+              )}
+            </div>
           </section>
 
-          <div className="flex justify-center mt-12">
-            <button onClick={runAnalysis} disabled={loading} className="px-16 py-5 bg-stone-900 text-white rounded-2xl font-bold shadow-2xl hover:bg-black transition-all flex items-center gap-3">
-               {loading ? <Loader2 className="animate-spin" /> : <Sparkles/>} 開始職能鑑定
+          {/* 3. 喜歡執行的項目 */}
+          <section className="bg-white rounded-3xl shadow-sm p-8 border border-stone-100">
+            <h2 className="text-2xl font-bold mb-6 flex items-center gap-3"><Heart className="text-amber-600" /> 3. 興趣與偏好</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+               {INTEREST_OPTIONS.map(opt => (
+                 <button 
+                  key={opt.id} 
+                  onClick={() => handleInterestToggle(opt.label)}
+                  className={`p-4 rounded-2xl border-2 font-bold text-sm transition-all ${formData.interests.includes(opt.label) ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-stone-100 text-stone-500 hover:border-amber-200'}`}
+                 >
+                   {opt.label}
+                 </button>
+               ))}
+            </div>
+            <div>
+              <label className="block text-xs font-black text-stone-400 uppercase mb-2">說明自己喜歡卻不在題目中的內容</label>
+              <textarea 
+                className="w-full p-4 rounded-xl border-2 border-stone-100 focus:border-amber-500 outline-none h-24" 
+                placeholder="還有什麼特別喜歡做的事嗎？" 
+                value={formData.otherInterests} 
+                onChange={(e) => setFormData({...formData, otherInterests: e.target.value})}
+              ></textarea>
+            </div>
+          </section>
+
+          <div className="flex justify-center pt-6">
+            <button onClick={runAnalysis} disabled={loading} className="px-20 py-6 bg-stone-900 text-white rounded-2xl font-black text-lg shadow-2xl hover:bg-black hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-4">
+               {loading ? <Loader2 className="animate-spin" /> : <Sparkles/>} 開始深度適性分析
             </button>
           </div>
         </div>
       ) : result && (
-        <div id="analysis-result" className="animate-in fade-in space-y-8">
-           <div className="bg-white rounded-3xl p-8 border-l-[12px] border-amber-600 shadow-sm">
-              <h2 className="text-4xl font-black text-stone-900">{result.summary.userName} 的評分報告</h2>
-              <div className="flex flex-wrap gap-2 mt-4">
-                {result.tags.map((tag, i) => <span key={i} className="px-4 py-1.5 bg-amber-50 text-amber-700 rounded-full text-xs font-black border border-amber-100">#{tag}</span>)}
+        <div id="analysis-result" className="animate-in fade-in space-y-12">
+           {/* 報告頭部 */}
+           <div className="bg-white rounded-3xl p-10 border-l-[16px] border-amber-600 shadow-sm">
+              <span className="text-amber-600 font-black text-xs uppercase tracking-[0.2em] mb-2 block">Official Assessment Report</span>
+              <h2 className="text-4xl font-black text-stone-900">{result.summary.userName} 的人才鑑定報告</h2>
+              <div className="flex flex-wrap gap-2 mt-6">
+                {result.tags.map((tag, i) => <span key={i} className="px-5 py-2 bg-amber-600 text-white rounded-full text-xs font-black shadow-sm">#{tag}</span>)}
               </div>
            </div>
 
-           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-3xl p-8 border border-stone-100 shadow-sm h-[400px]">
-                <h3 className="text-xl font-bold mb-4">五維職能分析</h3>
-                <ResponsiveContainer width="100%" height="90%">
-                   <RadarChart data={result.radarData}>
-                      <PolarGrid stroke="#e7e5e4" />
-                      <PolarAngleAxis dataKey="subject" tick={{fontSize: 10, fontWeight: 'bold'}} />
-                      <Radar dataKey="A" stroke="#d97706" fill="#d97706" fillOpacity={0.4} strokeWidth={2} />
-                   </RadarChart>
-                </ResponsiveContainer>
+           {/* 任務明細表格 (新增) */}
+           <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm">
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-3"><ListOrdered className="text-amber-600"/> 任務時數分配明細表</h3>
+              <div className="overflow-hidden rounded-2xl border border-stone-100">
+                <table className="w-full text-left">
+                  <thead className="bg-stone-50 border-b border-stone-100">
+                    <tr>
+                      <th className="px-6 py-4 text-xs font-black text-stone-400 uppercase">任務項目</th>
+                      <th className="px-6 py-4 text-xs font-black text-stone-400 uppercase text-right">執行時數</th>
+                      <th className="px-6 py-4 text-xs font-black text-stone-400 uppercase text-right">佔比 (對總工時)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-50">
+                    {formData.tasks.map((t, i) => (
+                      <tr key={i}>
+                        <td className="px-6 py-4 font-bold text-stone-700">{t.name}</td>
+                        <td className="px-6 py-4 text-right font-mono text-amber-700">{t.hours} h</td>
+                        <td className="px-6 py-4 text-right font-mono text-stone-400">{((t.hours / formData.totalWeeklyHours) * 100).toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                    {result.summary.otherTaskHours > 0 && (
+                      <tr>
+                        <td className="px-6 py-4 font-bold text-stone-700">其他補充任務 (Regex 提取)</td>
+                        <td className="px-6 py-4 text-right font-mono text-amber-700">{result.summary.otherTaskHours} h</td>
+                        <td className="px-6 py-4 text-right font-mono text-stone-400">{((result.summary.otherTaskHours / formData.totalWeeklyHours) * 100).toFixed(1)}%</td>
+                      </tr>
+                    )}
+                    <tr className="bg-stone-50/50">
+                      <td className="px-6 py-4 font-bold text-stone-500 italic">雜項 (差值)</td>
+                      <td className="px-6 py-4 text-right font-mono text-stone-400">{result.summary.miscHours} h</td>
+                      <td className="px-6 py-4 text-right font-mono text-stone-400">{((result.summary.miscHours / formData.totalWeeklyHours) * 100).toFixed(1)}%</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div className="bg-white rounded-3xl p-8 border border-stone-100 shadow-sm">
-                <h3 className="text-xl font-bold mb-4">任務時數分配</h3>
-                <div className="h-[280px]">
-                   <ResponsiveContainer width="100%" height="100%">
+           </div>
+
+           {/* 數據圖表 */}
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm flex flex-col items-center">
+                <h3 className="text-xl font-bold mb-8 w-full">五維職能分析圖</h3>
+                <div className="w-full h-[350px]">
+                  <ResponsiveContainer>
+                    <RadarChart data={result.radarData}>
+                      <PolarGrid stroke="#f1f1f0" />
+                      <PolarAngleAxis dataKey="subject" tick={{fontSize: 11, fontWeight: 'bold'}} />
+                      <Radar dataKey="A" stroke="#d97706" fill="#d97706" fillOpacity={0.4} strokeWidth={2} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="bg-white rounded-3xl p-10 border border-stone-100 shadow-sm flex flex-col items-center">
+                <h3 className="text-xl font-bold mb-8 w-full">工時分配圓餅圖 (總量 100%)</h3>
+                <div className="w-full h-[350px]">
+                   <ResponsiveContainer>
                       <PieChart>
-                         <Pie data={result.pieData} dataKey="value" innerRadius={60} outerRadius={90} paddingAngle={5}>
-                            {result.pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                         <Pie data={result.pieData} dataKey="value" innerRadius={70} outerRadius={100} paddingAngle={5}>
+                            {result.pieData.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
                          </Pie>
-                         <Tooltip />
+                         <Tooltip contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}} />
                       </PieChart>
                    </ResponsiveContainer>
                 </div>
               </div>
            </div>
 
-           <div className="bg-white rounded-3xl p-8 md:p-14 border border-stone-100 shadow-sm text-lg leading-relaxed whitespace-pre-wrap">
-              <h3 className="text-2xl font-black mb-8 border-b pb-4 flex items-center gap-3"><UserCircle className="text-amber-600" /> 主管評語</h3>
-              {result.suitabilityAdvice}
+           {/* 深度剖析 */}
+           <div className="grid grid-cols-1 gap-8">
+              <div className="bg-white rounded-3xl p-10 md:p-14 border border-stone-100 shadow-sm">
+                <h3 className="text-2xl font-black mb-8 border-b pb-6 flex items-center gap-3"><FileText className="text-amber-600"/> 個人興趣與適才剖析</h3>
+                <div className="text-stone-700 leading-relaxed space-y-6 text-lg whitespace-pre-wrap font-medium">
+                  {result.suitabilityAdvice}
+                </div>
+              </div>
+
+              <div className="bg-stone-900 rounded-3xl p-10 md:p-14 text-white shadow-2xl">
+                <h3 className="text-2xl font-black mb-8 border-b border-stone-800 pb-6 flex items-center gap-3"><MessageSquare className="text-amber-600"/> 生成式 AI 與工具協助建議</h3>
+                <div className="text-stone-300 leading-relaxed text-lg whitespace-pre-wrap font-medium opacity-90">
+                  {result.aiAssistance}
+                </div>
+              </div>
            </div>
 
+           {/* 操作按鈕 */}
            <div className="flex flex-col sm:flex-row justify-center gap-6 pb-20 print:hidden">
-              <button onClick={() => window.print()} className="px-10 py-5 bg-amber-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl"><Download size={22}/> 匯出 PDF</button>
-              <button onClick={() => setShowNotionModal(true)} className="px-10 py-5 bg-stone-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 shadow-xl"><Share2 size={22}/> 存入 Notion</button>
+              <button onClick={() => window.print()} className="px-12 py-5 bg-amber-600 text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl"><Download size={22}/> 下載 PDF 報告</button>
+              <button onClick={() => setShowNotionModal(true)} className="px-12 py-5 bg-stone-900 text-white rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl"><Database size={22}/> 同步至資料庫</button>
            </div>
         </div>
       )}
 
-      {/* Notion 設定彈窗 - 強化 Make.com 教學版 */}
+      {/* Notion 設定彈窗 (保持之前版本) */}
       {showNotionModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-xl p-10 shadow-2xl animate-in fade-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-xl p-10 shadow-2xl animate-in fade-in zoom-in duration-300">
             <div className="flex justify-between items-center mb-8">
-              <div className="flex items-center gap-3">
-                <Database className="text-stone-900" size={32} />
-                <h3 className="text-2xl font-black">Notion 自動化同步</h3>
-              </div>
+              <h3 className="text-2xl font-black">Notion 自動化同步</h3>
               <button onClick={() => setShowNotionModal(false)} className="text-stone-300 hover:text-stone-600 p-2"><Plus className="rotate-45" size={32}/></button>
             </div>
-
             <div className="space-y-6">
-              {/* Webhook 連線教學區塊 */}
-              <div className="bg-amber-50 border-2 border-amber-100 rounded-3xl p-6 shadow-sm">
-                <button 
-                  onClick={() => setShowWebhookHelp(!showWebhookHelp)}
-                  className="flex items-center justify-between w-full text-amber-900 font-black text-lg mb-2"
-                >
-                  <span className="flex items-center gap-2"><Zap size={20} className="text-amber-600"/> 連線步驟指南</span>
-                  {showWebhookHelp ? <ChevronUp size={24}/> : <ChevronDown size={24}/>}
-                </button>
-                
-                {showWebhookHelp && (
-                  <div className="mt-4 space-y-6 text-sm text-stone-700 leading-relaxed border-t border-amber-200 pt-6">
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 bg-amber-600 text-white rounded-full flex items-center justify-center font-black">1</div>
-                      <div className="space-y-1">
-                        <p className="font-black text-amber-900">複製 Make.com 網址</p>
-                        <p className="text-xs">在 Make.com 新增 Custom Webhook 後，點擊 <strong>"Copy address"</strong>。</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 bg-amber-600 text-white rounded-full flex items-center justify-center font-black">2</div>
-                      <div className="space-y-1 flex-1">
-                        <p className="font-black text-amber-900">貼入下方欄位並發送</p>
-                        <p className="text-xs mb-3">貼上後，點擊最下方的 <strong>『確認並發送資料』</strong>。</p>
-                        <div className="bg-white p-3 rounded-2xl border border-amber-200">
-                          <label className="block text-[10px] font-black text-stone-400 uppercase mb-2">Webhook URL</label>
-                          <input type="text" className="w-full p-3 rounded-xl border-2 border-stone-100 bg-stone-50 outline-none focus:border-amber-500 font-mono text-[10px]" placeholder="https://hook.make.com/..." value={notionConfig.webhookUrl} onChange={(e) => setNotionConfig({...notionConfig, webhookUrl: e.target.value, mode: 'webhook'})} />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 bg-stone-900 text-white rounded-full flex items-center justify-center font-black">3</div>
-                      <div className="space-y-2">
-                        <p className="font-black text-stone-900">回到 Make.com 觀察視窗</p>
-                        <p className="text-xs">當發送完成後，請立即切換回 Make.com 網頁，原本旋轉的等待圖示會變成下圖：</p>
-                        <div className="bg-green-100 text-green-800 p-3 rounded-xl flex items-center gap-2 font-black text-xs border border-green-200 animate-pulse">
-                          <Check size={16}/> Successfully determined
-                        </div>
-                        <p className="text-[10px] text-stone-400 italic font-medium">※ 這代表 Make.com 已經抓到資料結構，您現在可以點擊 OK 並連結 Notion 模組了！</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <div className="bg-amber-50 rounded-2xl p-6">
+                <label className="block text-xs font-black text-stone-400 uppercase mb-2">Make.com Webhook URL</label>
+                <input type="text" className="w-full p-4 rounded-xl border-2 border-stone-100 outline-none" placeholder="貼上 Webhook 網址" value={notionConfig.webhookUrl} onChange={(e) => setNotionConfig({...notionConfig, webhookUrl: e.target.value})} />
               </div>
-
-              <div className="pt-4">
-                <button 
-                  onClick={handleSaveToNotion}
-                  disabled={notionSaving}
-                  className={`w-full py-5 rounded-3xl font-black text-white flex items-center justify-center gap-3 shadow-xl transition-all active:scale-95 ${notionSuccess ? 'bg-green-600' : 'bg-stone-900 hover:bg-black'}`}
-                >
-                  {notionSaving ? <Loader2 className="animate-spin" size={24}/> : notionSuccess ? <><Check size={24}/> 測試資料已成功送出</> : <><Send size={24}/> 確認並發送資料</>}
-                </button>
-              </div>
-
-              <div className="pt-6 border-t border-stone-100">
-                <button onClick={copyToNotion} className={`w-full py-4 rounded-2xl font-black border-2 transition-all flex items-center justify-center gap-3 ${notionCopied ? 'border-green-600 text-green-600 bg-green-50' : 'border-stone-100 text-stone-400 hover:text-amber-600'}`}>
-                  <Copy size={20}/> {notionCopied ? '已複製 Markdown 格式' : '複製 Markdown (手動貼上備案)'}
-                </button>
-              </div>
+              <button onClick={handleSaveToNotion} disabled={notionSaving} className="w-full py-5 bg-stone-900 text-white rounded-2xl font-black flex items-center justify-center gap-3">
+                {notionSaving ? <Loader2 className="animate-spin" /> : notionSuccess ? <Check /> : <Send />} 確認發送
+              </button>
+              <button onClick={copyToNotion} className="w-full py-4 border-2 border-stone-100 rounded-2xl font-black text-stone-500">
+                {notionCopied ? "已複製 Markdown" : "複製報告 Markdown"}
+              </button>
             </div>
           </div>
         </div>
