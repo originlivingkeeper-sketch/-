@@ -6,18 +6,16 @@ export interface TaskEntry {
 
 export interface AssessmentData {
   userName: string;
-  totalWeeklyHours: number;
+  totalDailyHours: number;
   tasks: TaskEntry[];
   otherTasks: string;
-  interests: string[];
-  otherInterests: string;
 }
 
 export interface NotionConfig {
   apiKey: string;
   databaseId: string;
-  webhookUrl: string; // 新增 Webhook 欄位
-  mode: 'api' | 'webhook'; // 增加模式切換
+  webhookUrl: string;
+  mode: 'api' | 'webhook';
 }
 
 export interface AnalysisResult {
@@ -36,7 +34,7 @@ export interface AnalysisResult {
   tags: string[];
   summary: {
     userName: string;
-    totalWeeklyHours: number;
+    totalDailyHours: number;
     trackedHours: number;
     miscHours: number;
     otherTaskHours: number;
