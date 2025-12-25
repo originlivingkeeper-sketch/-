@@ -103,12 +103,11 @@ const App: React.FC = () => {
       const trackedHours = formData.tasks.reduce((sum, t) => sum + t.hours, 0) + totalOtherHours;
       const miscHours = Math.max(0, formData.totalWeeklyHours - trackedHours);
 
-      // 分象限歸類邏輯 (基於權重)
       const q1Tasks = formData.tasks.filter(t => SKILL_OPTIONS.find(o => o.label === t.name)?.weight === 4);
       const q2Tasks = formData.tasks.filter(t => SKILL_OPTIONS.find(o => o.label === t.name)?.weight === 3);
       const q4Tasks = [
         ...formData.tasks.filter(t => SKILL_OPTIONS.find(o => o.label === t.name)?.weight === 2),
-        ...parsedOtherTasks // 額外任務計 1分/半小時，等同權重 2
+        ...parsedOtherTasks 
       ];
       const q3Tasks = formData.tasks.filter(t => SKILL_OPTIONS.find(o => o.label === t.name)?.weight === 1);
 
@@ -117,13 +116,6 @@ const App: React.FC = () => {
       const q4Hours = q4Tasks.reduce((s, t) => s + t.hours, 0);
       const q3Hours = q3Tasks.reduce((s, t) => s + t.hours, 0) + miscHours;
 
-      /**
-       * 核心計分：
-       * 1. 以 40 小時為標準。
-       * 2. Q1=4, Q2=3, Q4=2, Q3=1。
-       * 3. 分數 = (時數 * 2 * 權重)
-       * 4. 總分 = 實際獲得分數 / 實際工時 * 40 (標竿化)
-       */
       const actualTotalHours = q1Hours + q2Hours + q4Hours + q3Hours;
       const rawWeightedPoints = (q1Hours * 2 * 4) + (q2Hours * 2 * 3) + (q4Hours * 2 * 2) + (q3Hours * 2 * 1);
       
@@ -131,19 +123,16 @@ const App: React.FC = () => {
         ? Math.round((rawWeightedPoints / actualTotalHours) * 40)
         : 80;
 
-      // 象限座標映射
-      // X: 緊急度 (Q1+Q4)-(Q2+Q3)
-      // Y: 重要度 (Q1+Q2)-(Q3+Q4)
       const xRatio = actualTotalHours > 0 ? ((q1Hours + q4Hours) - (q2Hours + q3Hours)) / actualTotalHours : 0;
       const yRatio = actualTotalHours > 0 ? ((q1Hours + q2Hours) - (q3Hours + q4Hours)) / actualTotalHours : 0;
       
       const mapPos = { x: xRatio * 100, y: yRatio * 100 };
 
       const matrixData = {
-        q1: { title: "第一象限：重要且緊急", tasks: q1Tasks, hours: q1Hours, range: "240-320 pts" },
-        q2: { title: "第二象限：重要不緊急", tasks: q2Tasks, hours: q2Hours, range: "160-240 pts" },
-        q4: { title: "第四象限：不重要但緊急", tasks: q4Tasks, hours: q4Hours, range: "160-240 pts" },
-        q3: { title: "第三象限：不重要不緊急", tasks: q3Tasks, hours: q3Hours, range: "80-160 pts", idleHours: miscHours }
+        q1: { title: "右上：第一象限 (重要且緊急)", tasks: q1Tasks, hours: q1Hours },
+        q2: { title: "左上：第二象限 (重要不緊急)", tasks: q2Tasks, hours: q2Hours },
+        q4: { title: "右下：第四象限 (不重要但緊急)", tasks: q4Tasks, hours: q4Hours },
+        q3: { title: "左下：第三象限 (不重要不緊急)", tasks: q3Tasks, hours: q3Hours, idleHours: miscHours }
       };
 
       const pieData: any[] = [
@@ -255,14 +244,14 @@ const App: React.FC = () => {
                   return (
                     <div key={opt.id} className={`p-4 rounded-2xl border-2 transition-all ${task ? 'border-amber-600 bg-amber-50/50' : 'border-stone-100 hover:border-stone-200'}`}>
                       <label className="flex items-center gap-3 cursor-pointer mb-3">
-                        <input type="checkbox" checked={!!task} onChange={() => handleTaskToggle(opt.label)} className="w-5 h-5 rounded-lg text-amber-600" />
-                        <span className="text-sm font-black text-stone-700 leading-snug">{opt.label}</span>
+                        <input type="checkbox" checked={!!task} onChange={() => handleTaskToggle(opt.label)} className="w-7 h-7 rounded-lg text-amber-600" />
+                        <span className="text-xl font-black text-stone-700 leading-snug">{opt.label}</span>
                       </label>
                       {task && (
-                        <div className="flex items-center justify-between bg-white rounded-xl p-1.5 border border-amber-200">
-                          <button onClick={() => updateHours(opt.label, -0.5)} className="p-1.5 text-stone-400"><Minus size={16}/></button>
-                          <span className="text-sm font-black text-amber-700">{task.hours} H</span>
-                          <button onClick={() => updateHours(opt.label, 0.5)} className="p-1.5 text-stone-400"><Plus size={16}/></button>
+                        <div className="flex items-center justify-between bg-white rounded-xl p-2 border border-amber-200">
+                          <button onClick={() => updateHours(opt.label, -0.5)} className="p-1.5 text-stone-400 hover:text-amber-600 transition-colors"><Minus size={20}/></button>
+                          <span className="text-lg font-black text-amber-700">{task.hours} H</span>
+                          <button onClick={() => updateHours(opt.label, 0.5)} className="p-1.5 text-stone-400 hover:text-amber-600 transition-colors"><Plus size={20}/></button>
                         </div>
                       )}
                     </div>
@@ -271,9 +260,9 @@ const App: React.FC = () => {
               </div>
 
               <div className="mt-8 bg-stone-50 rounded-3xl p-6 border border-stone-100">
-                <label className="block text-xs font-black text-stone-400 uppercase mb-3 tracking-widest italic">額外任務輸入 (自動計為權重 2 級別)</label>
+                <label className="block font-black text-stone-400 uppercase mb-3 tracking-widest italic text-xl">額外任務輸入</label>
                 <textarea 
-                  className="w-full p-5 rounded-2xl border-2 border-white focus:border-amber-500 outline-none h-24 text-stone-700 font-medium shadow-inner" 
+                  className="w-full p-5 rounded-2xl border-2 border-white focus:border-amber-500 outline-none h-24 text-stone-700 font-medium shadow-inner text-lg" 
                   placeholder="例如：協助購物 2h，整理陽台 1小時" 
                   value={formData.otherTasks} 
                   onChange={(e) => setFormData({...formData, otherTasks: e.target.value})}
@@ -285,12 +274,12 @@ const App: React.FC = () => {
               <h2 className="text-2xl font-black mb-8 flex items-center gap-3"><Heart className="text-amber-600" /> 3. 適性傾向調查</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
                  {INTEREST_OPTIONS.map(opt => (
-                   <button key={opt.id} onClick={() => handleInterestToggle(opt.label)} className={`p-5 rounded-2xl border-2 font-black text-sm transition-all ${formData.interests.includes(opt.label) ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-stone-100 text-stone-500'}`}>{opt.label}</button>
+                   <button key={opt.id} onClick={() => handleInterestToggle(opt.label)} className={`p-5 rounded-2xl border-2 font-black text-xl transition-all ${formData.interests.includes(opt.label) ? 'bg-amber-600 border-amber-600 text-white shadow-lg' : 'bg-white border-stone-100 text-stone-500'}`}>{opt.label}</button>
                  ))}
               </div>
               <div className="bg-stone-50 rounded-3xl p-6 border border-stone-100">
-                <label className="block text-xs font-black text-stone-400 uppercase mb-3 tracking-widest italic">自定義興趣補充</label>
-                <textarea className="w-full p-5 rounded-2xl border-2 border-white focus:border-amber-500 outline-none h-24 text-stone-700 font-medium shadow-inner" placeholder="還有其他想分享的專長或熱愛嗎？" value={formData.otherInterests} onChange={(e) => setFormData({...formData, otherInterests: e.target.value})}></textarea>
+                <label className="block font-black text-stone-400 uppercase mb-3 tracking-widest italic text-xl">自定義興趣補充</label>
+                <textarea className="w-full p-5 rounded-2xl border-2 border-white focus:border-amber-500 outline-none h-24 text-stone-700 font-medium shadow-inner text-lg" placeholder="還有其他想分享的專長或熱愛嗎？" value={formData.otherInterests} onChange={(e) => setFormData({...formData, otherInterests: e.target.value})}></textarea>
               </div>
             </section>
 
@@ -300,67 +289,67 @@ const App: React.FC = () => {
           <div id="analysis-result" className="animate-in fade-in slide-in-from-bottom-8 duration-1000 space-y-12">
              <div className="bg-white rounded-[2.5rem] p-10 md:p-14 border border-stone-100 shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center">
                 <div className="z-10">
-                   <span className="text-amber-600 font-black text-xs uppercase tracking-widest mb-4 block italic">Professional Assessment Report</span>
-                   <h2 className="text-5xl font-black text-stone-900 tracking-tight">{result.summary.userName} <span className="text-2xl font-normal text-stone-400">適性評核報告</span></h2>
+                   <span className="text-amber-600 font-black text-xs uppercase tracking-widest mb-4 block italic">Assessment Report</span>
+                   <h2 className="text-5xl font-black text-stone-900 tracking-tight">{result.summary.userName} <span className="text-2xl font-normal text-stone-400">評核報告</span></h2>
                    <div className="flex flex-wrap gap-2 mt-6">{result.tags.map((tag: string, i: number) => <span key={i} className="px-4 py-1.5 bg-stone-100 text-stone-600 rounded-full text-[10px] font-black uppercase">#{tag}</span>)}</div>
                 </div>
                 <div className="mt-8 md:mt-0 flex flex-col items-end bg-stone-50 p-6 rounded-[2rem] border border-stone-100 z-10">
                    <div className="flex items-center gap-2 mb-1 text-stone-400 font-black text-[10px] uppercase tracking-widest"><Award size={14}/> 綜合適性強度得分</div>
                    <div className="text-7xl font-black text-stone-900 leading-none">{result.personalScore}<span className="text-sm font-bold text-stone-400 ml-1 italic">/ 320</span></div>
-                   <div className="mt-2 text-[10px] font-bold text-stone-400 tracking-wide">標竿範疇: 80 - 320 pts</div>
+                   <div className="mt-2 text-[10px] font-bold text-stone-400">理論基準: 80 - 320 pts</div>
                 </div>
              </div>
 
              <div className="bg-white rounded-[2.5rem] p-10 md:p-14 border border-stone-100 shadow-sm">
-                <h3 className="text-2xl font-black mb-10 flex items-center gap-4 text-stone-800 border-b border-stone-50 pb-6"><LayoutGrid className="text-amber-600" /> 適性職能矩陣 (事後配分統整)</h3>
+                <h3 className="text-2xl font-black mb-10 flex items-center gap-4 text-stone-800 border-b border-stone-50 pb-6"><LayoutGrid className="text-amber-600" /> 適性職能矩陣 (配分統整)</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Q1 */}
-                  <div className={`p-8 rounded-[2rem] border transition-all ${result.personalScore >= 240 ? 'bg-red-50/40 border-red-100' : 'bg-stone-50/40 border-stone-100'}`}>
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-xs font-black text-red-600 uppercase tracking-widest">Q1. 重要且緊急</h4>
-                      <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full font-black">Weight 4</span>
-                    </div>
-                    <div className="space-y-1.5 mb-6 min-h-[60px]">
-                      {result.matrixData.q1.tasks.length > 0 ? result.matrixData.q1.tasks.map((t: any, i: number) => <div key={i} className="text-[11px] font-bold flex justify-between text-stone-600"><span>• {t.name}</span><span>{t.hours}H</span></div>) : <div className="text-[11px] text-stone-300 italic">無歸類任務</div>}
-                    </div>
-                    <div className="text-right border-t border-red-50 pt-3 text-red-700 font-black text-xs">積分: {result.matrixData.q1.hours * 2 * 4} pts</div>
-                  </div>
-
-                  {/* Q2 */}
+                  {/* 左上 Q2 */}
                   <div className={`p-8 rounded-[2rem] border transition-all ${result.personalScore >= 160 && result.personalScore < 240 ? 'bg-blue-50/40 border-blue-100' : 'bg-stone-50/40 border-stone-100'}`}>
                     <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest">Q2. 重要不緊急</h4>
+                      <h4 className="text-xs font-black text-blue-600 uppercase tracking-widest">Q2. 重要不緊急 (左上)</h4>
                       <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-black">Weight 3</span>
                     </div>
                     <div className="space-y-1.5 mb-6 min-h-[60px]">
                       {result.matrixData.q2.tasks.length > 0 ? result.matrixData.q2.tasks.map((t: any, i: number) => <div key={i} className="text-[11px] font-bold flex justify-between text-stone-600"><span>• {t.name}</span><span>{t.hours}H</span></div>) : <div className="text-[11px] text-stone-300 italic">無歸類任務</div>}
                     </div>
-                    <div className="text-right border-t border-blue-50 pt-3 text-blue-700 font-black text-xs">積分: {result.matrixData.q2.hours * 2 * 3} pts</div>
+                    <div className="text-right border-t border-blue-50 pt-3 text-blue-700 font-black text-xs">小計: {result.matrixData.q2.hours * 2 * 3} pts</div>
                   </div>
 
-                  {/* Q4 */}
-                  <div className={`p-8 rounded-[2rem] border transition-all ${result.personalScore >= 160 && result.personalScore < 240 ? 'bg-amber-50/40 border-amber-100' : 'bg-stone-50/40 border-stone-100'}`}>
+                  {/* 右上 Q1 */}
+                  <div className={`p-8 rounded-[2rem] border transition-all ${result.personalScore >= 240 ? 'bg-red-50/40 border-red-100' : 'bg-stone-50/40 border-stone-100'}`}>
                     <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-xs font-black text-amber-600 uppercase tracking-widest">Q4. 不重要但緊急</h4>
-                      <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-full font-black">Weight 2</span>
+                      <h4 className="text-xs font-black text-red-600 uppercase tracking-widest">Q1. 重要且緊急 (右上)</h4>
+                      <span className="text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full font-black">Weight 4</span>
                     </div>
                     <div className="space-y-1.5 mb-6 min-h-[60px]">
-                      {result.matrixData.q4.tasks.length > 0 ? result.matrixData.q4.tasks.map((t: any, i: number) => <div key={i} className="text-[11px] font-bold flex justify-between text-stone-600"><span>• {t.name}</span><span>{t.hours}H</span></div>) : <div className="text-[11px] text-stone-300 italic">無歸類任務</div>}
+                      {result.matrixData.q1.tasks.length > 0 ? result.matrixData.q1.tasks.map((t: any, i: number) => <div key={i} className="text-[11px] font-bold flex justify-between text-stone-600"><span>• {t.name}</span><span>{t.hours}H</span></div>) : <div className="text-[11px] text-stone-300 italic">無歸類任務</div>}
                     </div>
-                    <div className="text-right border-t border-amber-50 pt-3 text-amber-700 font-black text-xs">積分: {result.matrixData.q4.hours * 2 * 2} pts</div>
+                    <div className="text-right border-t border-red-50 pt-3 text-red-700 font-black text-xs">小計: {result.matrixData.q1.hours * 2 * 4} pts</div>
                   </div>
 
-                  {/* Q3 */}
+                  {/* 左下 Q3 */}
                   <div className={`p-8 rounded-[2rem] border transition-all ${result.personalScore < 160 ? 'bg-stone-200/40 border-stone-300' : 'bg-stone-50/40 border-stone-100'}`}>
                     <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-xs font-black text-stone-500 uppercase tracking-widest">Q3. 不重要不緊急</h4>
+                      <h4 className="text-xs font-black text-stone-500 uppercase tracking-widest">Q3. 不重要不緊急 (左下)</h4>
                       <span className="text-[10px] bg-stone-500 text-white px-2 py-0.5 rounded-full font-black">Weight 1</span>
                     </div>
                     <div className="space-y-1.5 mb-6 min-h-[60px]">
                       {result.matrixData.q3.tasks.map((t: any, i: number) => <div key={i} className="text-[11px] font-bold flex justify-between text-stone-500"><span>• {t.name}</span><span>{t.hours}H</span></div>)}
                       {result.matrixData.q3.idleHours > 0 && <div className="text-[11px] font-bold flex justify-between text-stone-400 italic"><span>• 未指定服務項目或雜務時間</span><span>{result.matrixData.q3.idleHours}H</span></div>}
                     </div>
-                    <div className="text-right border-t border-stone-200 pt-3 text-stone-500 font-black text-xs">積分: {Math.round(result.matrixData.q3.hours * 2 * 1)} pts</div>
+                    <div className="text-right border-t border-stone-200 pt-3 text-stone-500 font-black text-xs">小計: {Math.round(result.matrixData.q3.hours * 2 * 1)} pts</div>
+                  </div>
+
+                  {/* 右下 Q4 */}
+                  <div className={`p-8 rounded-[2rem] border transition-all ${result.personalScore >= 160 && result.personalScore < 240 ? 'bg-amber-50/40 border-amber-100' : 'bg-stone-50/40 border-stone-100'}`}>
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-xs font-black text-amber-600 uppercase tracking-widest">Q4. 不重要但緊急 (右下)</h4>
+                      <span className="text-[10px] bg-amber-600 text-white px-2 py-0.5 rounded-full font-black">Weight 2</span>
+                    </div>
+                    <div className="space-y-1.5 mb-6 min-h-[60px]">
+                      {result.matrixData.q4.tasks.length > 0 ? result.matrixData.q4.tasks.map((t: any, i: number) => <div key={i} className="text-[11px] font-bold flex justify-between text-stone-600"><span>• {t.name}</span><span>{t.hours}H</span></div>) : <div className="text-[11px] text-stone-300 italic">無歸類任務</div>}
+                    </div>
+                    <div className="text-right border-t border-amber-50 pt-3 text-amber-700 font-black text-xs">小計: {result.matrixData.q4.hours * 2 * 2} pts</div>
                   </div>
                 </div>
              </div>
@@ -368,10 +357,10 @@ const App: React.FC = () => {
              <div className="bg-white rounded-[2.5rem] p-10 md:p-14 border border-stone-100 shadow-sm">
                 <h3 className="text-2xl font-black mb-10 flex items-center gap-4 text-stone-800 border-b border-stone-50 pb-6"><Target className="text-amber-600" /> 四象限職能分布地圖</h3>
                 <div className="w-full h-[450px] bg-stone-100 rounded-[2.5rem] p-8 relative border border-stone-200/50 shadow-inner">
-                  <div className="absolute top-8 right-8 text-[10px] font-black text-red-300 uppercase tracking-widest text-right">第一象限<br/>重要緊急 (240-320)</div>
-                  <div className="absolute top-8 left-8 text-[10px] font-black text-blue-300 uppercase tracking-widest text-left">第二象限<br/>重要不緊急 (160-240)</div>
-                  <div className="absolute bottom-8 left-8 text-[10px] font-black text-stone-300 uppercase tracking-widest text-left">第三象限<br/>不重要不緊急 (80-160)</div>
-                  <div className="absolute bottom-8 right-8 text-[10px] font-black text-amber-300 uppercase tracking-widest text-right">第四象限<br/>不重要緊急 (160-240)</div>
+                  <div className="absolute top-8 right-8 text-[10px] font-black text-red-300 uppercase tracking-widest text-right">第一象限 (右上)</div>
+                  <div className="absolute top-8 left-8 text-[10px] font-black text-blue-300 uppercase tracking-widest text-left">第二象限 (左上)</div>
+                  <div className="absolute bottom-8 left-8 text-[10px] font-black text-stone-300 uppercase tracking-widest text-left">第三象限 (左下)</div>
+                  <div className="absolute bottom-8 right-8 text-[10px] font-black text-amber-300 uppercase tracking-widest text-right">第四象限 (右下)</div>
 
                   <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
@@ -380,7 +369,7 @@ const App: React.FC = () => {
                       <ZAxis type="number" range={[500, 500]} />
                       <ReferenceLine x={0} stroke="#d1d5db" strokeWidth={2} strokeDasharray="5 5" />
                       <ReferenceLine y={0} stroke="#d1d5db" strokeWidth={2} strokeDasharray="5 5" />
-                      <Scatter name="人才位置" data={[{ x: result.mapPos.x, y: result.mapPos.y }]} fill="#d97706" />
+                      <Scatter name="位置" data={[{ x: result.mapPos.x, y: result.mapPos.y }]} fill="#d97706" />
                     </ScatterChart>
                   </ResponsiveContainer>
                   
@@ -395,24 +384,17 @@ const App: React.FC = () => {
                     <User size={20} className="text-white" />
                   </div>
                 </div>
-                <div className="mt-6 text-center text-xs font-bold text-stone-400 italic">
-                  * 職能定位結論：您的量能核心落在「{
-                    result.mapPos.x >= 0 && result.mapPos.y >= 0 ? '第一象限' :
-                    result.mapPos.x < 0 && result.mapPos.y >= 0 ? '第二象限' :
-                    result.mapPos.x < 0 && result.mapPos.y < 0 ? '第三象限' : '第四象限'
-                  }」
-                </div>
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                 <div className="bg-white rounded-[2.5rem] p-10 border border-stone-100 shadow-sm">
-                  <h3 className="text-xs font-black mb-8 text-stone-400 uppercase tracking-widest text-center italic">五維職能分佈 (Radar)</h3>
+                  <h3 className="text-xs font-black mb-8 text-stone-400 uppercase tracking-widest text-center italic">職能分佈</h3>
                   <div className="w-full h-[300px]">
                     <ResponsiveContainer><RadarChart data={result.radarData}><PolarGrid stroke="#f1f1f0" /><PolarAngleAxis dataKey="subject" tick={{fontSize: 10, fontWeight: '700', fill: '#a8a29e'}} /><Radar dataKey="A" stroke="#d97706" fill="#d97706" fillOpacity={0.4} strokeWidth={2} /></RadarChart></ResponsiveContainer>
                   </div>
                 </div>
                 <div className="bg-white rounded-[2.5rem] p-10 border border-stone-100 shadow-sm">
-                  <h3 className="text-xs font-black mb-8 text-stone-400 uppercase tracking-widest text-center italic">時數分佈細節 (Hours)</h3>
+                  <h3 className="text-xs font-black mb-8 text-stone-400 uppercase tracking-widest text-center italic">時數分佈</h3>
                   <div className="w-full h-[300px]">
                      <ResponsiveContainer><PieChart><Pie data={result.pieData} dataKey="value" innerRadius={50} outerRadius={75} label={renderOuterLabel}>{result.pieData.map((e: any, i: number) => <Cell key={i} fill={e.color} stroke="none" />)}</Pie></PieChart></ResponsiveContainer>
                   </div>
@@ -421,12 +403,12 @@ const App: React.FC = () => {
 
              <div className="space-y-10">
                 <div className="bg-white rounded-[2.5rem] p-10 md:p-14 border border-stone-100 shadow-sm leading-[2.2] text-lg">
-                  <h3 className="text-2xl font-black mb-8 flex items-center gap-4 text-stone-900 border-b pb-6 italic"><FileText className="text-amber-600" /> 適性與量能專家剖析</h3>
+                  <h3 className="text-2xl font-black mb-8 flex items-center gap-4 text-stone-900 border-b pb-6 italic"><FileText className="text-amber-600" /> 專家診斷剖析</h3>
                   <div className="whitespace-pre-wrap text-stone-700 font-medium">{result.suitabilityAdvice}</div>
                 </div>
-                <div className="bg-stone-900 rounded-[2.5rem] p-10 md:p-14 text-white shadow-2xl leading-[2.2] text-lg">
-                  <h3 className="text-2xl font-black mb-8 flex items-center gap-4 border-b border-stone-800 pb-6 italic"><MessageSquare className="text-amber-600" /> AI 轉型工具與賦能方案</h3>
-                  <div className="whitespace-pre-wrap text-stone-400 font-medium opacity-90">{result.aiAssistance}</div>
+                <div className="bg-sky-50 rounded-[2.5rem] p-10 md:p-14 text-black shadow-lg border border-sky-100 leading-[2.2] text-lg">
+                  <h3 className="text-2xl font-black mb-8 flex items-center gap-4 border-b border-sky-200 pb-6 italic"><MessageSquare className="text-sky-600" /> AI 轉型工具與賦能方案</h3>
+                  <div className="whitespace-pre-wrap font-medium">{result.aiAssistance}</div>
                 </div>
              </div>
 
