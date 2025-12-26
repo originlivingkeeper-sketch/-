@@ -15,6 +15,50 @@ import { getSuitabilityAnalysis } from './geminiService';
 
 const COLORS = ['#d97706', '#f59e0b', '#fbbf24', '#fcd34d', '#fef3c7', '#78716c', '#a8a29e', '#57534e'];
 
+// 標籤類別定義及其對應的服務 ID 與 職能分數 Key
+const TAG_LOGIC_GROUPS = [
+  { 
+    tag: '陪伴高手', 
+    ids: ['medical_escort', 'medical_escort_urgent', 'overnight', 'living_paid', 'daily_chat', 'daily_chat_urgent'],
+    scoreKey: 'emotional'
+  },
+  { 
+    tag: '服務大師', 
+    ids: ['living_free', 'vitals', 'medication', 'dining'],
+    scoreKey: 'medical'
+  },
+  { 
+    tag: '掃房專家', 
+    ids: ['cleaning'],
+    scoreKey: 'living'
+  },
+  { 
+    tag: '活動教練', 
+    ids: ['exercise_comm', 'exercise_ind', 'guidance'],
+    scoreKey: 'activity'
+  },
+  { 
+    tag: '行政強者', 
+    ids: ['mgmt_admin', 'record'],
+    scoreKey: 'admin'
+  },
+  { 
+    tag: '溝通專員', 
+    ids: ['general_admin'],
+    scoreKey: 'emotional'
+  },
+  { 
+    tag: '鷹眼司機', 
+    ids: ['transport'],
+    scoreKey: 'living'
+  },
+  { 
+    tag: '團康大師', 
+    ids: ['community_club', 'social_comm_act', 'social_group', 'special_proj', 'emergency_handle'],
+    scoreKey: 'activity'
+  }
+];
+
 const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -100,6 +144,31 @@ const App: React.FC = () => {
       const trackedHours = formData.tasks.reduce((sum, t) => sum + t.hours, 0) + totalOtherHours;
       const miscHours = Math.max(0, formData.totalDailyHours - trackedHours);
 
+      // 計算標籤邏輯
+      const calculatedTags = TAG_LOGIC_GROUPS
+        .map(group => {
+          // 找出屬於該組的所有任務時數總和
+          const groupTotalHours = formData.tasks
+            .filter(t => {
+              const opt = SKILL_OPTIONS.find(o => o.label === t.name);
+              return opt && group.ids.includes(opt.id);
+            })
+            .reduce((sum, t) => sum + t.hours, 0);
+          
+          return {
+            tag: group.tag,
+            hours: groupTotalHours,
+            score: (apiResult.scores as any)[group.scoreKey] || 0
+          };
+        })
+        .filter(item => item.hours > 0) // 僅保留當日有工時的標籤
+        .sort((a, b) => {
+          if (b.hours !== a.hours) return b.hours - a.hours; // 優先依工時排序
+          return b.score - a.score; // 工時相同則依職能分數排序
+        })
+        .slice(0, 3) // 取前三名
+        .map(item => item.tag);
+
       const q1Tasks = formData.tasks.filter(t => SKILL_OPTIONS.find(o => o.label === t.name)?.weight === 4);
       const q2Tasks = formData.tasks.filter(t => SKILL_OPTIONS.find(o => o.label === t.name)?.weight === 3);
       const q4Tasks = [
@@ -141,7 +210,7 @@ const App: React.FC = () => {
         pieData: pieData.filter(d => d.value > 0),
         suitabilityAdvice: apiResult.suitabilityAdvice,
         aiAssistance: apiResult.aiAssistance,
-        tags: apiResult.tags || [],
+        tags: calculatedTags, // 使用邏輯計算後的標籤
         matrixData,
         personalScore,
         mapPos,
@@ -166,7 +235,6 @@ const App: React.FC = () => {
     }
   };
 
-  // 輔助函式：格式化任務清單為字串
   const formatQuadrantTasks = (tasks: TaskEntry[], idleHours?: number) => {
     let list = tasks.map(t => `• ${t.name} ${t.hours}H`).join('\n');
     if (idleHours && idleHours > 0) {
@@ -189,7 +257,6 @@ const App: React.FC = () => {
         totalHours: result?.summary.totalDailyHours,
         trackedHours: result?.summary.trackedHours,
         analysisDate: new Date().toLocaleDateString('zh-TW'),
-        // 新增象限任務明細
         q1Tasks: formatQuadrantTasks(result?.matrixData.q1.tasks),
         q2Tasks: formatQuadrantTasks(result?.matrixData.q2.tasks),
         q3Tasks: formatQuadrantTasks(result?.matrixData.q3.tasks, result?.matrixData.q3.idleHours),
@@ -309,7 +376,13 @@ const App: React.FC = () => {
                       <Calendar size={14} /> {result.summary.workDate} 日誌分析報告
                    </div>
                    <h2 className="text-5xl font-black text-stone-900 tracking-tight">{result.summary.userName} <span className="text-2xl font-normal text-stone-400">日誌評核</span></h2>
-                   <div className="flex flex-wrap gap-2 mt-6">{result.tags.map((tag: string, i: number) => <span key={i} className="px-4 py-1.5 bg-stone-100 text-stone-600 rounded-full text-[10px] font-black uppercase">#{tag}</span>)}</div>
+                   <div className="flex flex-wrap gap-2 mt-6">
+                     {result.tags.length > 0 ? result.tags.map((tag: string, i: number) => (
+                       <span key={i} className="px-4 py-1.5 bg-amber-600 text-white rounded-full text-[12px] font-black uppercase shadow-sm">
+                         #{tag}
+                       </span>
+                     )) : <span className="text-stone-300 italic text-sm">今日尚無顯著專長標籤</span>}
+                   </div>
                 </div>
                 <div className="mt-8 md:mt-0 flex flex-col items-end bg-stone-50 p-6 rounded-[2rem] border border-stone-100 z-10 text-right">
                    <div className="flex items-center gap-2 mb-1 text-stone-400 font-black text-[10px] uppercase tracking-widest justify-end"><Award size={14}/> 綜合量能積分 (理論值 16-64)</div>

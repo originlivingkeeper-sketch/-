@@ -37,10 +37,6 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
        - 針對此人的今日任務，列出「哪些生成式 AI 或工具可以協助自動化或提升效率」。
        - 提供應用情境。
 
-    4. 指定標籤 (Tags)：
-       - 從以下清單選擇 3-4 個：
-       「打掃專門」、「打掃很厲害」、「很能聊天」、「生活大專家」、「運動專業戶」、「行政人才」、「都在打字」、「社交鬼才」。
-
     請嚴格遵守 JSON 格式回覆。
   `;
 
@@ -66,14 +62,10 @@ export const getSuitabilityAnalysis = async (data: AssessmentData) => {
                 },
                 required: ['emotional', 'medical', 'admin', 'living', 'activity']
               },
-              tags: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-              },
               suitabilityAdvice: { type: Type.STRING },
               aiAssistance: { type: Type.STRING }
             },
-            required: ['scores', 'tags', 'suitabilityAdvice', 'aiAssistance']
+            required: ['scores', 'suitabilityAdvice', 'aiAssistance']
           }
         }
       });
