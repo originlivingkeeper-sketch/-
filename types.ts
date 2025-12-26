@@ -6,6 +6,7 @@ export interface TaskEntry {
 
 export interface AssessmentData {
   userName: string;
+  workDate: string; // 新增日期欄位
   totalDailyHours: number;
   tasks: TaskEntry[];
   otherTasks: string;
@@ -34,6 +35,7 @@ export interface AnalysisResult {
   tags: string[];
   summary: {
     userName: string;
+    workDate: string; // 報告日期
     totalDailyHours: number;
     trackedHours: number;
     miscHours: number;

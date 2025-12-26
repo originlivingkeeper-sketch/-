@@ -7,7 +7,7 @@ import {
 import { 
   Loader2, Sparkles, Briefcase, Plus, Minus,
   Download, User, Clock, Database, Check, ListOrdered, Heart,
-  FileText, MessageSquare, Send, LayoutGrid, Award, Target
+  FileText, MessageSquare, Send, LayoutGrid, Award, Target, Calendar
 } from 'lucide-react';
 import { AssessmentData, AnalysisResult, NotionConfig, TaskEntry } from './types';
 import { SKILL_OPTIONS, RADAR_CATEGORIES } from './constants';
@@ -37,8 +37,12 @@ const App: React.FC = () => {
     };
   });
 
+  // 預設日期為今天 (YYYY-MM-DD)
+  const today = new Date().toISOString().split('T')[0];
+
   const [formData, setFormData] = useState<AssessmentData>({
     userName: '',
+    workDate: today,
     totalDailyHours: 8,
     tasks: [],
     otherTasks: ''
@@ -60,6 +64,12 @@ const App: React.FC = () => {
   const totalOtherHours = useMemo(() => 
     parsedOtherTasks.reduce((sum, t) => sum + t.hours, 0), 
   [parsedOtherTasks]);
+
+  // 即時計算目前勾選的總工時
+  const currentCalculatedHours = useMemo(() => {
+    const selectedTasksHours = formData.tasks.reduce((sum, t) => sum + t.hours, 0);
+    return selectedTasksHours + totalOtherHours;
+  }, [formData.tasks, totalOtherHours]);
 
   const handleTaskToggle = (label: string) => {
     const exists = formData.tasks.find(t => t.name === label);
@@ -139,6 +149,7 @@ const App: React.FC = () => {
         mapPos,
         summary: {
           userName: formData.userName,
+          workDate: formData.workDate,
           totalDailyHours: formData.totalDailyHours,
           actualTotalHours,
           trackedHours,
@@ -163,6 +174,7 @@ const App: React.FC = () => {
     try {
       const payload = {
         userName: result?.summary.userName,
+        workDate: result?.summary.workDate,
         tags: result?.tags,
         suitabilityAdvice: result?.suitabilityAdvice,
         aiAssistance: result?.aiAssistance,
@@ -205,17 +217,27 @@ const App: React.FC = () => {
         <header className="mb-12 text-center">
           <h1 className="text-3xl md:text-5xl font-extrabold text-stone-900 flex items-center justify-center gap-3 tracking-tight">
             <Briefcase className="text-amber-600 w-10 h-10 md:w-12 md:h-12" />
-            照顧管家適性判斷系統
+            照顧管家工作日誌系統
           </h1>
-          <p className="text-stone-500 mt-3 font-medium tracking-widest uppercase text-xs italic">Daily Strategic Assessment Portal</p>
+          <p className="text-stone-500 mt-3 font-medium tracking-widest uppercase text-xs italic">Daily Activity Logging & Assessment</p>
         </header>
 
         {!showResult || loading ? (
           <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <section className="bg-white rounded-[2rem] shadow-sm p-8 md:p-10 border border-stone-100">
                <h2 className="text-2xl font-black mb-8 flex items-center gap-3"><User className="text-amber-600" /> 1. 基本資料</h2>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <input type="text" className="w-full p-4 rounded-2xl border-2 border-stone-100 focus:border-amber-500 outline-none font-bold text-lg" placeholder="管家姓名" value={formData.userName} onChange={(e) => setFormData({...formData, userName: e.target.value})} />
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="flex flex-col">
+                    <span className="text-stone-400 font-bold text-xs uppercase mb-1">管家姓名</span>
+                    <input type="text" className="w-full p-4 rounded-2xl border-2 border-stone-100 focus:border-amber-500 outline-none font-bold text-lg" placeholder="姓名" value={formData.userName} onChange={(e) => setFormData({...formData, userName: e.target.value})} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-stone-400 font-bold text-xs uppercase mb-1">工作日期</span>
+                    <div className="relative">
+                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" size={20} />
+                      <input type="date" className="w-full p-4 pl-12 rounded-2xl border-2 border-stone-100 focus:border-amber-500 outline-none font-bold text-lg" value={formData.workDate} onChange={(e) => setFormData({...formData, workDate: e.target.value})} />
+                    </div>
+                  </div>
                   <div className="flex flex-col">
                     <span className="text-stone-400 font-bold text-xs uppercase mb-1">今日工時設定 (標竿 8H)</span>
                     <input type="number" className="w-full p-4 rounded-2xl border-2 border-stone-100 focus:border-amber-500 outline-none font-bold text-lg" value={formData.totalDailyHours} onChange={(e) => setFormData({...formData, totalDailyHours: Number(e.target.value)})} />
@@ -224,7 +246,14 @@ const App: React.FC = () => {
             </section>
 
             <section className="bg-white rounded-[2rem] shadow-sm p-8 md:p-10 border border-stone-100">
-              <h2 className="text-2xl font-black mb-8 flex items-center gap-3"><Clock className="text-amber-600" /> 2. 每日服務勾選</h2>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                <h2 className="text-2xl font-black flex items-center gap-3"><Clock className="text-amber-600" /> 2. 每日服務勾選</h2>
+                <div className={`px-6 py-3 rounded-full font-black text-sm flex items-center gap-3 transition-all ${currentCalculatedHours > formData.totalDailyHours ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                   <span>當前累計時數：</span>
+                   <span className="text-xl">{currentCalculatedHours.toFixed(1)}</span>
+                   <span>/ {formData.totalDailyHours} H</span>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {SKILL_OPTIONS.map(opt => {
                   const task = formData.tasks.find(t => t.name === opt.label);
@@ -257,27 +286,29 @@ const App: React.FC = () => {
               </div>
             </section>
 
-            <div className="flex justify-center pt-6"><button onClick={runAnalysis} disabled={loading} className="px-24 py-7 bg-stone-900 text-white rounded-[2rem] font-black text-xl shadow-2xl hover:bg-black transition-all flex items-center gap-5">{loading ? <Loader2 className="animate-spin" /> : <Sparkles />} 啟動單日深度分析</button></div>
+            <div className="flex justify-center pt-6"><button onClick={runAnalysis} disabled={loading} className="px-24 py-7 bg-stone-900 text-white rounded-[2rem] font-black text-xl shadow-2xl hover:bg-black transition-all flex items-center gap-5">{loading ? <Loader2 className="animate-spin" /> : <Sparkles />} 啟動單日日誌分析</button></div>
           </div>
         ) : result && (
           <div id="analysis-result" className="animate-in fade-in slide-in-from-bottom-8 duration-1000 space-y-12">
              <div className="bg-white rounded-[2.5rem] p-10 md:p-14 border border-stone-100 shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center">
                 <div className="z-10">
-                   <span className="text-amber-600 font-black text-xs uppercase tracking-widest mb-4 block italic">Daily Assessment Report</span>
-                   <h2 className="text-5xl font-black text-stone-900 tracking-tight">{result.summary.userName} <span className="text-2xl font-normal text-stone-400">今日評核</span></h2>
+                   <div className="flex items-center gap-2 text-amber-600 font-black text-xs uppercase tracking-widest mb-4 block italic">
+                      <Calendar size={14} /> {result.summary.workDate} 日誌分析報告
+                   </div>
+                   <h2 className="text-5xl font-black text-stone-900 tracking-tight">{result.summary.userName} <span className="text-2xl font-normal text-stone-400">日誌評核</span></h2>
                    <div className="flex flex-wrap gap-2 mt-6">{result.tags.map((tag: string, i: number) => <span key={i} className="px-4 py-1.5 bg-stone-100 text-stone-600 rounded-full text-[10px] font-black uppercase">#{tag}</span>)}</div>
                 </div>
                 <div className="mt-8 md:mt-0 flex flex-col items-end bg-stone-50 p-6 rounded-[2rem] border border-stone-100 z-10 text-right">
                    <div className="flex items-center gap-2 mb-1 text-stone-400 font-black text-[10px] uppercase tracking-widest justify-end"><Award size={14}/> 綜合量能積分 (理論值 16-64)</div>
                    <div className="text-7xl font-black text-stone-900 leading-none">{result.personalScore}<span className="text-sm font-bold text-stone-400 ml-1 italic">pts</span></div>
-                   <div className="mt-2 text-[10px] font-bold text-stone-400">依當日工時累加調整</div>
+                   <div className="mt-2 text-[10px] font-bold text-stone-400">依當日總計 {result.summary.trackedHours.toFixed(1)}H 累加調整</div>
                 </div>
              </div>
 
              <div className="bg-white rounded-[2.5rem] p-10 md:p-14 border border-stone-100 shadow-sm">
                 <h3 className="text-2xl font-black mb-10 flex items-center gap-4 text-stone-800 border-b border-stone-50 pb-6"><LayoutGrid className="text-amber-600" /> 適性職能矩陣 (配分統整)</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* 左上 Q2 */}
+                  {/* 第二象限 */}
                   <div className="p-8 rounded-[2rem] border bg-blue-50/20 border-blue-100">
                     <div className="flex justify-between items-center mb-6">
                       <h4 className="text-lg font-black text-blue-600 uppercase tracking-widest">第二象限</h4>
@@ -289,7 +320,7 @@ const App: React.FC = () => {
                     <div className="text-right border-t border-blue-50 pt-3 text-blue-700 font-black text-sm">小計: {result.matrixData.q2.hours * 2 * 3} pts</div>
                   </div>
 
-                  {/* 右上 Q1 */}
+                  {/* 第一象限 */}
                   <div className="p-8 rounded-[2rem] border bg-red-50/20 border-red-100">
                     <div className="flex justify-between items-center mb-6">
                       <h4 className="text-lg font-black text-red-600 uppercase tracking-widest">第一象限</h4>
@@ -301,7 +332,7 @@ const App: React.FC = () => {
                     <div className="text-right border-t border-red-50 pt-3 text-red-700 font-black text-sm">小計: {result.matrixData.q1.hours * 2 * 4} pts</div>
                   </div>
 
-                  {/* 左下 Q3 */}
+                  {/* 第三象限 */}
                   <div className="p-8 rounded-[2rem] border bg-stone-100/50 border-stone-200">
                     <div className="flex justify-between items-center mb-6">
                       <h4 className="text-lg font-black text-stone-500 uppercase tracking-widest">第三象限</h4>
@@ -314,7 +345,7 @@ const App: React.FC = () => {
                     <div className="text-right border-t border-stone-200 pt-3 text-stone-500 font-black text-sm">小計: {Math.round(result.matrixData.q3.hours * 2 * 1)} pts</div>
                   </div>
 
-                  {/* 右下 Q4 */}
+                  {/* 第四象限 */}
                   <div className="p-8 rounded-[2rem] border bg-amber-50/20 border-amber-100">
                     <div className="flex justify-between items-center mb-6">
                       <h4 className="text-lg font-black text-amber-600 uppercase tracking-widest">第四象限</h4>
