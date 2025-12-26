@@ -7,7 +7,8 @@ import {
 import { 
   Loader2, Sparkles, Briefcase, Plus, Minus,
   Download, User, Clock, Database, Check, ListOrdered, Heart,
-  FileText, MessageSquare, Send, LayoutGrid, Award, Target, Calendar
+  FileText, MessageSquare, Send, LayoutGrid, Award, Target, Calendar,
+  RotateCcw
 } from 'lucide-react';
 import { AssessmentData, AnalysisResult, NotionConfig, TaskEntry } from './types';
 import { SKILL_OPTIONS, RADAR_CATEGORIES } from './constants';
@@ -129,6 +130,12 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleReset = () => {
+    setShowResult(false);
+    setResult(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const runAnalysis = async () => {
     if (!formData.userName.trim()) { alert("請輸入姓名"); return; }
     setLoading(true);
@@ -244,7 +251,7 @@ const App: React.FC = () => {
   };
 
   const handleSaveToNotion = async () => {
-    if (!notionConfig.webhookUrl) { alert("請填入 Webhook URL"); return; }
+    if (!notionConfig.webhookUrl) { alert("系統配置異常：缺少 Webhook URL"); return; }
     setNotionSaving(true);
     try {
       const payload = {
@@ -268,10 +275,12 @@ const App: React.FC = () => {
         body: JSON.stringify(payload)
       });
       setNotionSuccess(true);
-      localStorage.setItem('notion_config', JSON.stringify(notionConfig));
-      setTimeout(() => { setNotionSuccess(false); setShowNotionModal(false); }, 2000);
+      setTimeout(() => { 
+        setNotionSuccess(false); 
+        setShowNotionModal(false); 
+      }, 2000);
     } catch (e) {
-      alert("傳送失敗");
+      alert("傳送失敗，請確認網路連線。");
     } finally {
       setNotionSaving(false);
     }
@@ -503,7 +512,8 @@ const App: React.FC = () => {
                 </div>
              </div>
 
-             <div className="flex flex-col sm:flex-row justify-center gap-6 pb-20 print:hidden">
+             <div className="flex flex-wrap justify-center gap-6 pb-20 print:hidden">
+                <button onClick={handleReset} className="px-10 py-5 bg-white text-stone-600 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:bg-stone-50 transition-all border border-stone-200 shadow-sm"><RotateCcw size={20}/> 再作一次</button>
                 <button onClick={() => window.print()} className="px-10 py-5 bg-stone-200/50 text-stone-900 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:bg-stone-200 transition-all border border-stone-200"><Download size={20}/> 輸出完整分析報告</button>
                 <button onClick={() => setShowNotionModal(true)} className="px-10 py-5 bg-stone-900 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:scale-105 transition-all shadow-xl"><Database size={20}/> 確認並同步到資料庫</button>
              </div>
@@ -518,9 +528,12 @@ const App: React.FC = () => {
                 <button onClick={() => setShowNotionModal(false)} className="text-stone-300 hover:text-stone-600 transition-colors p-2"><Plus className="rotate-45" size={32}/></button>
               </div>
               <div className="space-y-6">
-                <div className="bg-stone-50 rounded-2xl p-6 border border-stone-100">
-                  <label className="block text-[10px] font-black text-stone-400 uppercase mb-3 tracking-widest">Webhook Endpoint</label>
-                  <input type="text" className="w-full p-4 rounded-xl border border-stone-200 focus:border-amber-500 outline-none font-mono text-[10px]" value={notionConfig.webhookUrl} onChange={(e) => setNotionConfig({...notionConfig, webhookUrl: e.target.value})} />
+                <div className="bg-stone-50 rounded-3xl p-8 border border-stone-100 text-center">
+                  <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Database className="text-amber-600" size={32} />
+                  </div>
+                  <p className="text-stone-600 font-bold leading-relaxed mb-2">準備將「{result?.summary.userName}」的日誌報告</p>
+                  <p className="text-stone-400 text-xs font-medium">同步至企業人才資料庫系統</p>
                 </div>
                 <button onClick={handleSaveToNotion} disabled={notionSaving} className={`w-full py-5 rounded-2xl font-black text-sm flex items-center justify-center gap-3 transition-all ${notionSuccess ? 'bg-green-600 text-white' : 'bg-stone-900 hover:bg-black text-white'}`}>
                   {notionSaving ? <Loader2 className="animate-spin" /> : notionSuccess ? <Check /> : <Send />} 啟動資料傳輸
