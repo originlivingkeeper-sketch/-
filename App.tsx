@@ -37,7 +37,6 @@ const App: React.FC = () => {
     };
   });
 
-  // 預設日期為今天 (YYYY-MM-DD)
   const today = new Date().toISOString().split('T')[0];
 
   const [formData, setFormData] = useState<AssessmentData>({
@@ -65,7 +64,6 @@ const App: React.FC = () => {
     parsedOtherTasks.reduce((sum, t) => sum + t.hours, 0), 
   [parsedOtherTasks]);
 
-  // 即時計算目前勾選的總工時
   const currentCalculatedHours = useMemo(() => {
     const selectedTasksHours = formData.tasks.reduce((sum, t) => sum + t.hours, 0);
     return selectedTasksHours + totalOtherHours;
@@ -168,6 +166,15 @@ const App: React.FC = () => {
     }
   };
 
+  // 輔助函式：格式化任務清單為字串
+  const formatQuadrantTasks = (tasks: TaskEntry[], idleHours?: number) => {
+    let list = tasks.map(t => `• ${t.name} ${t.hours}H`).join('\n');
+    if (idleHours && idleHours > 0) {
+      list += (list ? '\n' : '') + `• 未指定服務或雜務 ${idleHours.toFixed(1)}H`;
+    }
+    return list || '無歸類任務';
+  };
+
   const handleSaveToNotion = async () => {
     if (!notionConfig.webhookUrl) { alert("請填入 Webhook URL"); return; }
     setNotionSaving(true);
@@ -180,7 +187,13 @@ const App: React.FC = () => {
         aiAssistance: result?.aiAssistance,
         personalScore: result?.personalScore,
         totalHours: result?.summary.totalDailyHours,
-        analysisDate: new Date().toLocaleDateString('zh-TW')
+        trackedHours: result?.summary.trackedHours,
+        analysisDate: new Date().toLocaleDateString('zh-TW'),
+        // 新增象限任務明細
+        q1Tasks: formatQuadrantTasks(result?.matrixData.q1.tasks),
+        q2Tasks: formatQuadrantTasks(result?.matrixData.q2.tasks),
+        q3Tasks: formatQuadrantTasks(result?.matrixData.q3.tasks, result?.matrixData.q3.idleHours),
+        q4Tasks: formatQuadrantTasks(result?.matrixData.q4.tasks),
       };
       await fetch(notionConfig.webhookUrl, {
         method: 'POST',
