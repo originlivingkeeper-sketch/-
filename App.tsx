@@ -210,7 +210,7 @@ const App: React.FC = () => {
         pieData: pieData.filter(d => d.value > 0),
         suitabilityAdvice: apiResult.suitabilityAdvice,
         aiAssistance: apiResult.aiAssistance,
-        tags: calculatedTags, // 使用邏輯計算後的標籤
+        tags: calculatedTags,
         matrixData,
         personalScore,
         mapPos,
@@ -250,7 +250,7 @@ const App: React.FC = () => {
       const payload = {
         userName: result?.summary.userName,
         workDate: result?.summary.workDate,
-        tags: result?.tags,
+        tags: result?.tags, // 標籤做為上傳項目
         suitabilityAdvice: result?.suitabilityAdvice,
         aiAssistance: result?.aiAssistance,
         personalScore: result?.personalScore,
@@ -505,7 +505,7 @@ const App: React.FC = () => {
 
              <div className="flex flex-col sm:flex-row justify-center gap-6 pb-20 print:hidden">
                 <button onClick={() => window.print()} className="px-10 py-5 bg-stone-200/50 text-stone-900 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:bg-stone-200 transition-all border border-stone-200"><Download size={20}/> 輸出完整分析報告</button>
-                <button onClick={() => setShowNotionModal(true)} className="px-10 py-5 bg-stone-900 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:scale-105 transition-all shadow-xl"><Database size={20}/> 同步至人才資料庫</button>
+                <button onClick={() => setShowNotionModal(true)} className="px-10 py-5 bg-stone-900 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:scale-105 transition-all shadow-xl"><Database size={20}/> 確認並同步到資料庫</button>
              </div>
           </div>
         )}
